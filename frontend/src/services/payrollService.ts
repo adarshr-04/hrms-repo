@@ -1,0 +1,42 @@
+import api from '@/lib/api';
+
+export interface PayrollData {
+  employee: number | string;
+  pay_period_start: string;
+  pay_period_end: string;
+  basic_salary: number;
+  allowances: number;
+  deductions: number;
+  tax: number;
+  bonus: number;
+  net_pay: number;
+  pay_date: string;
+  payment_mode: string;
+}
+
+export const payrollService = {
+  getAll: async (params?: any) => {
+    const response = await api.get('/payroll/payroll/', { params });
+    return response.data;
+  },
+
+  create: async (data: PayrollData) => {
+    const response = await api.post('/payroll/payroll/', data);
+    return response.data;
+  },
+
+  getStats: async () => {
+    // Custom calculation logic for the dashboard
+    const data = await api.get('/payroll/payroll/');
+    const results = data.results || data;
+    
+    const totalNetPay = results.reduce((acc: number, curr: any) => acc + parseFloat(curr.net_pay), 0);
+    const totalBonus = results.reduce((acc: number, curr: any) => acc + parseFloat(curr.bonus), 0);
+    
+    return {
+      totalNetPay,
+      totalBonus,
+      count: results.length
+    };
+  }
+};

@@ -1,0 +1,9 @@
+from rest_framework import viewsets
+from .models import Leave
+from .serializers import LeaveSerializer
+
+class LeaveViewSet(viewsets.ModelViewSet):
+    queryset = Leave.objects.all()
+    serializer_class = LeaveSerializer
+    filterset_fields = ['employee', 'leave_type', 'status']
+    search_fields = ['employee__first_name', 'employee__last_name', 'employee__employee_id']
