@@ -14,8 +14,6 @@ build/
 backend/venv/
 venv/
 .env
-requirements.txt
-backend/requirements.txt
 
 # Database
 *.sqlite3
