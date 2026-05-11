@@ -15,19 +15,7 @@ export default function AddEmployeePage() {
   const { register, handleSubmit, formState: { errors } } = useForm();
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [deptData, branchData] = await Promise.all([
-          employeeService.getDepartments(),
-          employeeService.getBranches()
-        ]);
-        setDepartments(deptData.results || deptData);
-        setBranches(branchData.results || branchData);
-      } catch (error) {
-        console.error("Failed to fetch form data", error);
-      }
-    };
-    fetchData();
+    // Departments and branches are now simple text fields, so no fetching needed.
   }, []);
 
   const onSubmit = async (data: any) => {
@@ -148,27 +136,19 @@ export default function AddEmployeePage() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-700">Department</label>
-              <select 
+              <input 
                 {...register("department", { required: true })}
-                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all appearance-none"
-              >
-                <option value="">Select Department</option>
-                {departments.map(dept => (
-                  <option key={dept.id} value={dept.id}>{dept.department_name}</option>
-                ))}
-              </select>
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                placeholder="Engineering"
+              />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-700">Branch</label>
-              <select 
+              <input 
                 {...register("branch", { required: true })}
-                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all appearance-none"
-              >
-                <option value="">Select Branch</option>
-                {branches.map(branch => (
-                  <option key={branch.id} value={branch.id}>{branch.branch_name}</option>
-                ))}
-              </select>
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                placeholder="Main HQ"
+              />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-700">Hire Date</label>

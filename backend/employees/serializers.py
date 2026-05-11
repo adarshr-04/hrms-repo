@@ -27,8 +27,6 @@ class EmployeeAddressSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class EmployeeSerializer(serializers.ModelSerializer):
-    department_name = serializers.ReadOnlyField(source='department.department_name')
-    branch_name = serializers.ReadOnlyField(source='branch.branch_name')
     manager_name = serializers.ReadOnlyField(source='manager.get_full_name')
     addresses = EmployeeAddressSerializer(many=True, read_only=True)
 
@@ -37,7 +35,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'employee_id', 'first_name', 'last_name', 'email', 
             'phone_number', 'date_of_birth', 'hire_date', 'job_title', 
-            'employment_type', 'status', 'department', 'department_name',
-            'branch', 'branch_name', 'manager', 'manager_name', 'addresses',
+            'employment_type', 'status', 'department', 
+            'branch', 'manager', 'manager_name', 'addresses',
             'created_at', 'updated_at'
         ]

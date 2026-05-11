@@ -61,8 +61,8 @@ class Employee(BaseModel):
     employment_type = models.CharField(max_length=20, choices=EMPLOYMENT_TYPES, default='FULL_TIME')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
     
-    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name='employees')
-    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True, related_name='employees')
+    department = models.CharField(max_length=100, blank=True, null=True)
+    branch = models.CharField(max_length=100, blank=True, null=True)
     manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='subordinates')
 
     def __str__(self):
