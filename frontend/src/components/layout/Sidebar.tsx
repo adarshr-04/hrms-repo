@@ -12,6 +12,7 @@ import {
   BarChart3, 
   Briefcase, 
   GraduationCap,
+  UserPlus,
   Settings,
   LogOut
 } from 'lucide-react';
@@ -27,6 +28,7 @@ const navItems = [
   { name: 'Performance', href: '/performance', icon: BarChart3 },
   { name: 'Projects', href: '/projects', icon: Briefcase },
   { name: 'Training', href: '/training', icon: GraduationCap },
+  { name: 'Recruitment', href: '/recruitment', icon: UserPlus },
 ];
 
 export function Sidebar() {
