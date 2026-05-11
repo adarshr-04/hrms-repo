@@ -19,7 +19,7 @@ import { format } from 'date-fns';
 
 export default function PayrollPage() {
   const [loading, setLoading] = useState(true);
-  const [payrollData, setPayrollData] = useState([]);
+  const [payrollData, setPayrollData] = useState<any[]>([]);
   const [stats, setStats] = useState({ totalNetPay: 0, totalBonus: 0, count: 0 });
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function PayrollPage() {
     }
   };
 
-  const formatCurrency = (amount) => {
+  const formatCurrency = (amount: any) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
@@ -157,7 +157,7 @@ export default function PayrollPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 uppercase">
-                          {record.employee_name?.split(' ').map(n => n[0]).join('') || '??'}
+                          {record.employee_name?.split(' ').map((n: any) => n[0]).join('') || '??'}
                         </div>
                         <span className="text-sm font-bold text-slate-900">{record.employee_name}</span>
                       </div>

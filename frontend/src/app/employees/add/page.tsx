@@ -9,8 +9,8 @@ import { employeeService } from '@/services/employeeService';
 export default function AddEmployeePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [departments, setDepartments] = useState([]);
-  const [branches, setBranches] = useState([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
   
   const { register, handleSubmit, formState: { errors } } = useForm();
 
@@ -30,7 +30,7 @@ export default function AddEmployeePage() {
     fetchData();
   }, []);
 
-  const onSubmit = async (data) => {
+  const onSubmit = async (data: any) => {
     setLoading(true);
     try {
       // Note: In a real scenario, we'd also need to create a User account 

@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 
 export default function LeavesPage() {
   const [loading, setLoading] = useState(true);
-  const [leaves, setLeaves] = useState([]);
+  const [leaves, setLeaves] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('PENDING');
 
   useEffect(() => {
@@ -37,7 +37,7 @@ export default function LeavesPage() {
     }
   };
 
-  const handleStatusUpdate = async (id, status) => {
+  const handleStatusUpdate = async (id: any, status: any) => {
     try {
       await leaveService.updateStatus(id, status);
       fetchLeaves(); // Refresh list
@@ -98,7 +98,7 @@ export default function LeavesPage() {
             >
               <div className="flex items-center gap-4 flex-1">
                 <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-700 font-bold uppercase">
-                  {leave.employee_name?.split(' ').map(n => n[0]).join('') || '??'}
+                  {leave.employee_name?.split(' ').map((n: any) => n[0]).join('') || '??'}
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900">{leave.employee_name}</h4>

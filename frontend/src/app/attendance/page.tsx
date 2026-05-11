@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 
 export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
-  const [records, setRecords] = useState([]);
+  const [records, setRecords] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export default function AttendancePage() {
     }
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: any) => {
     switch (status) {
       case 'PRESENT': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
       case 'ABSENT': return 'bg-red-50 text-red-700 border-red-100';
@@ -48,7 +48,7 @@ export default function AttendancePage() {
     }
   };
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: any) => {
     switch (status) {
       case 'PRESENT': return <UserCheck className="w-4 h-4" />;
       case 'ABSENT': return <UserX className="w-4 h-4" />;
@@ -158,7 +158,7 @@ export default function AttendancePage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 uppercase">
-                          {record.employee_name?.split(' ').map(n => n[0]).join('') || '??'}
+                          {record.employee_name?.split(' ').map((n: any) => n[0]).join('') || '??'}
                         </div>
                         <span className="text-sm font-bold text-slate-900">{record.employee_name}</span>
                       </div>

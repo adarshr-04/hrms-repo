@@ -25,10 +25,10 @@ const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899'
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState([]);
-  const [deptData, setDeptData] = useState([]);
-  const [attendanceTrend, setAttendanceTrend] = useState([]);
-  const [recentActivity, setRecentActivity] = useState([]);
+  const [stats, setStats] = useState<any[]>([]);
+  const [deptData, setDeptData] = useState<any[]>([]);
+  const [attendanceTrend, setAttendanceTrend] = useState<any[]>([]);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -50,13 +50,13 @@ export default function DashboardPage() {
       // Calculate Stats
       setStats([
         { name: 'Total Employees', value: empList.length, change: '+0%', trend: 'up', icon: Users, color: 'bg-blue-500' },
-        { name: 'Present Today', value: attList.filter(a => a.status === 'PRESENT').length, change: '0%', trend: 'up', icon: Calendar, color: 'bg-emerald-500' },
+        { name: 'Present Today', value: attList.filter((a: any) => a.status === 'PRESENT').length, change: '0%', trend: 'up', icon: Calendar, color: 'bg-emerald-500' },
         { name: 'Pending Leaves', value: '0', change: '0', trend: 'down', icon: Clock, color: 'bg-amber-500' },
         { name: 'Active Projects', value: '0', change: '+0', trend: 'up', icon: Briefcase, color: 'bg-indigo-500' },
       ]);
 
       // Calculate Department Breakdown
-      const depts = empList.reduce((acc, curr) => {
+      const depts = empList.reduce((acc: any, curr: any) => {
         const name = curr.department_name || 'Unassigned';
         acc[name] = (acc[name] || 0) + 1;
         return acc;

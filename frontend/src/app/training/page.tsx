@@ -19,7 +19,7 @@ import { format } from 'date-fns';
 
 export default function TrainingPage() {
   const [loading, setLoading] = useState(true);
-  const [trainings, setTrainings] = useState([]);
+  const [trainings, setTrainings] = useState<any[]>([]);
 
   useEffect(() => {
     fetchTrainings();

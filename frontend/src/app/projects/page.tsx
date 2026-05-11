@@ -19,7 +19,7 @@ import { format } from 'date-fns';
 
 export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
-  const [projects, setProjects] = useState([]);
+  const [projects, setProjects] = useState<any[]>([]);
 
   useEffect(() => {
     fetchProjects();
@@ -37,7 +37,7 @@ export default function ProjectsPage() {
     }
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: any) => {
     switch (status) {
       case 'IN_PROGRESS': return 'bg-blue-50 text-blue-700 border-blue-100';
       case 'COMPLETED': return 'bg-emerald-50 text-emerald-700 border-emerald-100';

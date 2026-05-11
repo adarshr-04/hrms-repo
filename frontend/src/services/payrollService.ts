@@ -27,8 +27,8 @@ export const payrollService = {
 
   getStats: async () => {
     // Custom calculation logic for the dashboard
-    const data = await api.get('/payroll/payroll/');
-    const results = data.results || data;
+    const response = await api.get('/payroll/payroll/');
+    const results = response.data.results || response.data;
     
     const totalNetPay = results.reduce((acc: number, curr: any) => acc + parseFloat(curr.net_pay), 0);
     const totalBonus = results.reduce((acc: number, curr: any) => acc + parseFloat(curr.bonus), 0);

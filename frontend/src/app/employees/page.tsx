@@ -20,7 +20,7 @@ import { employeeService } from '@/services/employeeService';
 
 export default function EmployeesPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [employees, setEmployees] = useState([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -144,7 +144,7 @@ export default function EmployeesPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3 text-slate-400">
-                        <Mail className="w-4 h-4 hover:text-indigo-600 transition-colors" title={emp.email} />
+                        <span title={emp.email}><Mail className="w-4 h-4 hover:text-indigo-600 transition-colors" /></span>
                         <Phone className="w-4 h-4 hover:text-indigo-600 transition-colors" />
                       </div>
                     </td>

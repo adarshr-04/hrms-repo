@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 
 export default function PerformancePage() {
   const [loading, setLoading] = useState(true);
-  const [reviews, setReviews] = useState([]);
+  const [reviews, setReviews] = useState<any[]>([]);
 
   useEffect(() => {
     fetchReviews();
@@ -35,7 +35,7 @@ export default function PerformancePage() {
     }
   };
 
-  const renderStars = (rating) => {
+  const renderStars = (rating: any) => {
     return (
       <div className="flex gap-0.5">
         {[1, 2, 3, 4, 5].map((star) => (
@@ -99,7 +99,7 @@ export default function PerformancePage() {
               <div key={review.id} className="p-6 hover:bg-slate-50/50 transition-all flex flex-col md:flex-row gap-6">
                 <div className="flex items-center gap-4 w-full md:w-64">
                   <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold uppercase">
-                    {review.employee_name?.split(' ').map(n => n[0]).join('') || '??'}
+                    {review.employee_name?.split(' ').map((n: any) => n[0]).join('') || '??'}
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-slate-900">{review.employee_name}</h4>
@@ -133,7 +133,7 @@ export default function PerformancePage() {
                   <div className="flex items-center justify-end gap-2">
                     <span className="text-sm font-semibold text-slate-700">{review.reviewer_name}</span>
                     <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center text-[10px] font-bold text-indigo-600">
-                      {review.reviewer_name?.split(' ').map(n => n[0]).join('') || '??'}
+                      {review.reviewer_name?.split(' ').map((n: any) => n[0]).join('') || '??'}
                     </div>
                   </div>
                 </div>
