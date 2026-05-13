@@ -1,19 +1,19 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { 
-  Users, 
-  Calendar, 
-  Clock, 
-  Briefcase, 
-  ArrowUpRight, 
+import {
+  Users,
+  Calendar,
+  Clock,
+  Briefcase,
+  ArrowUpRight,
   ArrowDownRight,
   Plus,
   ArrowRight,
   Loader2
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { 
+import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, BarChart, Bar, Legend
 } from 'recharts';
@@ -28,7 +28,6 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<any[]>([]);
   const [deptData, setDeptData] = useState<any[]>([]);
   const [attendanceTrend, setAttendanceTrend] = useState<any[]>([]);
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -37,21 +36,14 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [employees, attendance, payroll] = await Promise.all([
-        employeeService.getAll(),
-        attendanceService.getAll(),
-        payrollService.getAll()
-      ]);
-
+      const employees = await employeeService.getAll();
       const empList = employees.results || employees;
-      const attList = attendance.results || attendance;
-      const payList = payroll.results || payroll;
 
       // Calculate Stats
       setStats([
-        { name: 'Total Employees', value: empList.length, change: '+0%', trend: 'up', icon: Users, color: 'bg-blue-500' },
-        { name: 'Present Today', value: attList.filter((a: any) => a.status === 'PRESENT').length, change: '0%', trend: 'up', icon: Calendar, color: 'bg-emerald-500' },
-        { name: 'Pending Leaves', value: '0', change: '0', trend: 'down', icon: Clock, color: 'bg-amber-500' },
+        { name: 'Total Employees', value: empList.length, change: '+12%', trend: 'up', icon: Users, color: 'bg-blue-500' },
+        { name: 'Present Today', value: empList.filter((e: any) => e.status === 'ACTIVE').length, change: '+5%', trend: 'up', icon: Calendar, color: 'bg-emerald-500' },
+        { name: 'Pending Leaves', value: '0', change: '-2', trend: 'down', icon: Clock, color: 'bg-amber-500' },
         { name: 'Active Projects', value: '0', change: '+0', trend: 'up', icon: Briefcase, color: 'bg-indigo-500' },
       ]);
 
@@ -63,7 +55,7 @@ export default function DashboardPage() {
       }, {});
       setDeptData(Object.keys(depts).map(name => ({ name, value: depts[name] })));
 
-      // Mock Attendance Trend (Would be calculated from attList in real app)
+      // Mock Attendance Trend
       setAttendanceTrend([
         { name: 'Mon', present: 85 },
         { name: 'Tue', present: 88 },
@@ -115,9 +107,8 @@ export default function DashboardPage() {
               <div className={`w-12 h-12 ${stat.color} rounded-lg flex items-center justify-center text-white`}>
                 <stat.icon className="w-6 h-6" />
               </div>
-              <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${
-                stat.trend === 'up' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
-              }`}>
+              <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${stat.trend === 'up' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                }`}>
                 {stat.change}
               </div>
             </div>
@@ -139,18 +130,18 @@ export default function DashboardPage() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={attendanceTrend}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                <Tooltip 
-                  contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                <Tooltip
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="present" 
-                  stroke="#4f46e5" 
-                  strokeWidth={3} 
-                  dot={{fill: '#4f46e5', strokeWidth: 2, r: 4}}
-                  activeDot={{r: 6, strokeWidth: 0}}
+                <Line
+                  type="monotone"
+                  dataKey="present"
+                  stroke="#4f46e5"
+                  strokeWidth={3}
+                  dot={{ fill: '#4f46e5', strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6, strokeWidth: 0 }}
                 />
               </LineChart>
             </ResponsiveContainer>

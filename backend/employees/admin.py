@@ -1,29 +1,32 @@
 from django.contrib import admin
-from .models import Location, Branch, Department, Employee, EmployeeAddress
-
-@admin.register(Location)
-class LocationAdmin(admin.ModelAdmin):
-    list_display = ('city', 'state', 'country', 'postal_code')
-    search_fields = ('city', 'country')
-
-@admin.register(Branch)
-class BranchAdmin(admin.ModelAdmin):
-    list_display = ('branch_name', 'location')
-    list_filter = ('location',)
+from .models import Department, Employee
 
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
-    list_display = ('department_name', 'department_code', 'branch', 'manager')
-    search_fields = ('department_name', 'department_code')
+    list_display = ('department_name', 'description')
+    search_fields = ('department_name',)
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
     list_display = ('employee_id', 'first_name', 'last_name', 'email', 'job_title', 'department', 'status')
-    list_filter = ('status', 'employment_type', 'department', 'branch')
-    search_fields = ('employee_id', 'first_name', 'last_name', 'email')
-    raw_id_fields = ('user', 'manager')
-
-@admin.register(EmployeeAddress)
-class EmployeeAddressAdmin(admin.ModelAdmin):
-    list_display = ('employee', 'address_type', 'city', 'country')
-    list_filter = ('address_type',)
+    list_filter = ('department', 'status', 'employment_type')
+    search_fields = ('first_name', 'last_name', 'employee_id', 'email')
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ('Primary Information', {
+            'fields': ('user', 'employee_id', 'first_name', 'last_name', 'avatar')
+        }),
+        ('Contact Details', {
+            'fields': ('email', 'phone_number', 'alternative_email', 'alternative_phone_number')
+        }),
+        ('Professional Details', {
+            'fields': ('department', 'job_title', 'employment_type', 'status', 'hire_date', 'end_date', 'manager')
+        }),
+        ('Personal Details', {
+            'fields': ('date_of_birth', 'current_address', 'permanent_address')
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )

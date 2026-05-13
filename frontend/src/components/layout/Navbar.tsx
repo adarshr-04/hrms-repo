@@ -9,9 +9,9 @@ export function Navbar() {
       <div className="flex items-center gap-4 flex-1">
         <div className="relative max-w-md w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input 
-            type="text" 
-            placeholder="Search employees, projects, or reports..." 
+          <input
+            type="text"
+            placeholder="Search employees, projects, or reports..."
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
           />
         </div>
@@ -22,9 +22,9 @@ export function Navbar() {
           <Bell className="w-5 h-5" />
           <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
         </button>
-        
+
         <div className="h-8 w-px bg-slate-200 mx-2" />
-        
+
         <div className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 p-1 rounded-lg transition-all">
           <div className="text-right hidden sm:block">
             <p className="text-sm font-semibold text-slate-900 leading-none">Admin User</p>

@@ -16,6 +16,8 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -31,6 +33,11 @@ urlpatterns = [
     path('api/payroll/', include('payroll.urls')),
     path('api/performance/', include('performance.urls')),
     path('api/projects/', include('projects.urls')),
+    path('api/accounts/', include('accounts.urls')),
     path('api/training/', include('training.urls')),
     path('api/recruitment/', include('recruitment.urls')),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
