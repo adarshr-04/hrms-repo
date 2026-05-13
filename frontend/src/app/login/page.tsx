@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import axios from 'axios';
 import { useAuth } from '@/context/AuthContext';
 import { Lock, User, Loader2, AlertCircle, Shield, Building2 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -18,8 +19,18 @@ export default function LoginPage() {
     setError('');
     try {
       await login({ username, password });
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Invalid username or password');
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        const message =
+          err.response?.data?.detail ||
+          err.response?.data?.message ||
+          (err.code === 'ECONNABORTED'
+            ? 'Login request timed out. Check if the backend is running.'
+            : 'Unable to reach the server. Check if the backend is running and CORS is configured.');
+        setError(message);
+      } else {
+        setError('Login failed due to an unexpected error.');
+      }
     } finally {
       setLoading(false);
     }

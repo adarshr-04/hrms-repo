@@ -3,20 +3,26 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import { User } from '@/types';
+
+type LoginCredentials = Record<string, unknown>;
 
 interface AuthContextType {
-  user: any;
-  login: (credentials: any) => Promise<void>;
+  user: User | null;
+  login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => void;
   loading: boolean;
   isAuthenticated: boolean;
   refreshUser: () => Promise<void>;
+  isAdmin: boolean;
+  isManager: boolean;
+  isEmployee: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -44,15 +50,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth();
   }, [fetchUserProfile]);
 
-  const login = async (credentials: any) => {
-    const response = await api.post('/token/', credentials);
-    const { access, refresh } = response.data;
-    
-    localStorage.setItem('access_token', access);
-    localStorage.setItem('refresh_token', refresh);
-    
-    await fetchUserProfile();
-    router.push('/');
+  const login = async (credentials: LoginCredentials) => {
+    // Ensure we don't keep a previous user's session if login fails.
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    setUser(null);
+
+    try {
+      const response = await api.post('/token/', credentials);
+      const { access, refresh } = response.data;
+
+      localStorage.setItem('access_token', access);
+      localStorage.setItem('refresh_token', refresh);
+
+      await fetchUserProfile();
+      router.push('/');
+    } catch (error) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      setUser(null);
+      throw error;
+    }
   };
 
   const logout = () => {
@@ -62,6 +80,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/login');
   };
 
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+  const isManager = user?.role === 'DEPT_MANAGER' || isAdmin;
+  const isEmployee = user?.role === 'EMPLOYEE';
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -69,7 +91,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout, 
       loading, 
       isAuthenticated: !!user,
-      refreshUser: fetchUserProfile
+      refreshUser: fetchUserProfile,
+      isAdmin,
+      isManager,
+      isEmployee
     }}>
       {children}
     </AuthContext.Provider>

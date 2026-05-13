@@ -20,20 +20,23 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 
 const navItems = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Employees', href: '/employees', icon: Users },
-  { name: 'Attendance', href: '/attendance', icon: CalendarCheck },
-  { name: 'Leaves', href: '/leaves', icon: FileText },
-  { name: 'Payroll', href: '/payroll', icon: CreditCard },
-  { name: 'Performance', href: '/performance', icon: BarChart3 },
-  { name: 'Projects', href: '/projects', icon: Briefcase },
-  { name: 'Training', href: '/training', icon: GraduationCap },
-  { name: 'Recruitment', href: '/recruitment', icon: UserPlus },
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['ADMIN', 'DEPT_MANAGER', 'EMPLOYEE'] },
+  { name: 'Employees', href: '/employees', icon: Users, roles: ['ADMIN', 'DEPT_MANAGER', 'EMPLOYEE'] },
+  { name: 'Attendance', href: '/attendance', icon: CalendarCheck, roles: ['ADMIN', 'DEPT_MANAGER', 'EMPLOYEE'] },
+  { name: 'Leaves', href: '/leaves', icon: FileText, roles: ['ADMIN', 'DEPT_MANAGER', 'EMPLOYEE'] },
+  { name: 'Payroll', href: '/payroll', icon: CreditCard, roles: ['ADMIN'] },
+  { name: 'Performance', href: '/performance', icon: BarChart3, roles: ['ADMIN', 'DEPT_MANAGER', 'EMPLOYEE'] },
+  { name: 'Projects', href: '/projects', icon: Briefcase, roles: ['ADMIN', 'DEPT_MANAGER', 'EMPLOYEE'] },
+  { name: 'Training', href: '/training', icon: GraduationCap, roles: ['ADMIN', 'DEPT_MANAGER', 'EMPLOYEE'] },
+  { name: 'Recruitment', href: '/recruitment', icon: UserPlus, roles: ['ADMIN'] },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const userRole = user?.role || 'EMPLOYEE';
+
+  const filteredNavItems = navItems.filter(item => item.roles.includes(userRole));
 
   return (
     <div className="flex flex-col h-full w-64 bg-slate-900 text-slate-300 border-r border-slate-800">
@@ -45,7 +48,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 px-4 space-y-1">
-        {navItems.map((item) => {
+        {filteredNavItems.map((item) => {
           const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
           return (
             <Link
@@ -72,6 +75,10 @@ export function Sidebar() {
       </nav>
 
       <div className="p-4 mt-auto border-t border-slate-800">
+        <div className="px-3 py-2 mb-2">
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Logged in as</p>
+          <p className="text-xs font-bold text-indigo-400 truncate">{user?.first_name} ({userRole})</p>
+        </div>
         <button className="flex items-center gap-3 px-3 py-2 w-full text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all">
           <Settings className="w-5 h-5" />
           <span>Settings</span>

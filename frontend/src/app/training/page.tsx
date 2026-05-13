@@ -21,10 +21,6 @@ export default function TrainingPage() {
   const [loading, setLoading] = useState(true);
   const [trainings, setTrainings] = useState<any[]>([]);
 
-  useEffect(() => {
-    fetchTrainings();
-  }, []);
-
   const fetchTrainings = async () => {
     setLoading(true);
     try {
@@ -36,6 +32,10 @@ export default function TrainingPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchTrainings();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -61,7 +61,7 @@ export default function TrainingPage() {
             <GraduationCap className="w-12 h-12 text-slate-300" />
             <div>
               <p className="text-lg font-bold text-slate-900">No training programs</p>
-              <p className="text-sm max-w-xs mx-auto">Create your first training course to start building your team's expertise.</p>
+              <p className="text-sm max-w-xs mx-auto">Create your first training course to start building your team&apos;s expertise.</p>
             </div>
           </div>
         ) : (
@@ -86,7 +86,7 @@ export default function TrainingPage() {
                 </div>
 
                 <p className="text-sm text-slate-600 leading-relaxed line-clamp-2 italic">
-                  "{training.description}"
+                  &quot;{training.description}&quot;
                 </p>
 
                 <div className="pt-4 border-t border-slate-50 grid grid-cols-2 gap-4">

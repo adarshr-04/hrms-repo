@@ -10,6 +10,11 @@ export interface TaskLog {
 }
 
 export const projectService = {
+  getProjects: async (params?: { status?: string; search?: string }) => {
+    const response = await api.get('/projects/projects/', { params });
+    return response.data;
+  },
+
   getTaskLogs: async () => {
     const response = await api.get('/projects/task-logs/');
     return response.data;
