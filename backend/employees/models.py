@@ -8,80 +8,71 @@ class BaseModel(models.Model):
     class Meta:
         abstract = True
 
-class Location(BaseModel):
-    street_address = models.CharField(max_length=255)
-    city = models.CharField(max_length=100)
-    state = models.CharField(max_length=100)
-    country = models.CharField(max_length=100)
-    postal_code = models.CharField(max_length=20)
-
-    def __str__(self):
-        return f"{self.city}, {self.country}"
-
-class Branch(BaseModel):
-    branch_name = models.CharField(max_length=100)
-    location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='branches')
-
-    def __str__(self):
-        return self.branch_name
-
 class Department(BaseModel):
-    department_name = models.CharField(max_length=100)
-    department_code = models.CharField(max_length=20, unique=True)
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='departments')
-    manager = models.ForeignKey('Employee', on_delete=models.SET_NULL, null=True, blank=True, related_name='managed_department')
+    department_name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return self.department_name
 
 class Employee(BaseModel):
+    GENDER_CHOICES = [
+        ('M', 'Male'),
+        ('F', 'Female'),
+        ('O', 'Other'),
+    ]
+
     EMPLOYMENT_TYPES = [
-        ('FULL_TIME', 'Full Time'),
-        ('PART_TIME', 'Part Time'),
+        ('FULL_TIME', 'Full-time'),
+        ('PART_TIME', 'Part-time'),
         ('CONTRACT', 'Contract'),
         ('INTERN', 'Intern'),
     ]
-    
+
     STATUS_CHOICES = [
         ('ACTIVE', 'Active'),
         ('INACTIVE', 'Inactive'),
-        ('ON_LEAVE', 'On Leave'),
         ('TERMINATED', 'Terminated'),
+        ('ON_LEAVE', 'On Leave'),
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='employee_profile', null=True, blank=True)
-    employee_id = models.CharField(max_length=20, unique=True)
+    employee_id = models.CharField(max_length=20, unique=True, blank=True)
     first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100, blank=True, null=True)
     email = models.EmailField(unique=True)
     phone_number = models.CharField(max_length=20, blank=True, null=True)
-    date_of_birth = models.DateField()
-    hire_date = models.DateField()
-    job_title = models.CharField(max_length=100)
+    date_of_birth = models.DateField(blank=True, null=True)
+    hire_date = models.DateField(blank=True, null=True)
+    job_title = models.CharField(max_length=100, blank=True, null=True)
     employment_type = models.CharField(max_length=20, choices=EMPLOYMENT_TYPES, default='FULL_TIME')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
+    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
     
-    department = models.CharField(max_length=100, blank=True, null=True)
-    branch = models.CharField(max_length=100, blank=True, null=True)
+    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name='employees')
     manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='subordinates')
+    
+    alternative_email = models.EmailField(blank=True, null=True)
+    alternative_phone_number = models.CharField(max_length=20, blank=True, null=True)
+    current_address = models.TextField(blank=True, null=True)
+    permanent_address = models.TextField(blank=True, null=True)
+    end_date = models.DateField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name} ({self.employee_id})"
+        return f"{self.first_name} {self.last_name}"
 
-class EmployeeAddress(BaseModel):
-    ADDRESS_TYPES = [
-        ('HOME', 'Home'),
-        ('CURRENT', 'Current'),
-        ('PERMANENT', 'Permanent'),
-    ]
-
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='addresses')
-    street_address = models.CharField(max_length=255)
-    city = models.CharField(max_length=100)
-    state = models.CharField(max_length=100)
-    country = models.CharField(max_length=100)
-    postal_code = models.CharField(max_length=20)
-    address_type = models.CharField(max_length=20, choices=ADDRESS_TYPES, default='HOME')
-
-    def __str__(self):
-        return f"{self.address_type} address for {self.employee}"
+    def save(self, *args, **kwargs):
+        if not self.employee_id:
+            last_employee = Employee.objects.all().order_by('id').last()
+            next_id = 1
+            if last_employee:
+                next_id = last_employee.id + 1
+            
+            self.employee_id = f'EMP-{next_id:04d}'
+            
+            # Uniqueness check loop
+            while Employee.objects.filter(employee_id=self.employee_id).exists():
+                next_id += 1
+                self.employee_id = f'PITS{next_id:04d}'
+                
+        super(Employee, self).save(*args, **kwargs)

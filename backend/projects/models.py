@@ -31,3 +31,13 @@ class ProjectAssignment(BaseModel):
 
     def __str__(self):
         return f"{self.employee.employee_id} assigned to {self.project.project_name}"
+
+class TaskLog(BaseModel):
+    date = models.DateField()
+    task_description = models.TextField()
+    status = models.CharField(max_length=50, default='Not Started')
+    owner = models.CharField(max_length=100)
+    remarks = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.date} - {self.owner} - {self.task_description[:30]}"
