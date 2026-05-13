@@ -2,36 +2,60 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Mail, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Mail,
   Phone,
   Building2,
   Users,
   ChevronLeft,
   ChevronRight,
-  Loader2
+  Loader2,
+  UserCheck,
+  MapPin,
+  Calendar,
+  MoreVertical,
+  X,
+  TrendingUp,
+  ExternalLink,
+  Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { employeeService } from '@/services/employeeService';
+import { toast } from 'sonner';
 
 export default function EmployeesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ total: 0, active: 0, departments: 0 });
+  const [showFilters, setShowFilters] = useState(false);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [filters, setFilters] = useState({
+    department: '',
+    status: '',
+    type: ''
+  });
 
   useEffect(() => {
     fetchEmployees();
+    fetchDepartments();
   }, []);
 
   const fetchEmployees = async () => {
     setLoading(true);
     try {
       const data = await employeeService.getAll();
-      setEmployees(data.results || data);
+      const results = data.results || data;
+      setEmployees(results);
+
+      setStats({
+        total: results.length,
+        active: results.filter((e: any) => e.status === 'ACTIVE').length,
+        departments: new Set(results.map((e: any) => e.department)).size
+      });
     } catch (error) {
       console.error("Failed to fetch employees", error);
     } finally {
@@ -39,144 +63,229 @@ export default function EmployeesPage() {
     }
   };
 
+  const fetchDepartments = async () => {
+    try {
+      const data = await employeeService.getDepartments();
+      setDepartments(data);
+    } catch (error) {
+      console.error("Failed to fetch departments", error);
+    }
+  };
+
+  const getAvatarUrl = (path: string) => {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
+    return `${baseUrl}${path}`;
+  };
+
+  const filteredEmployees = employees.filter((emp: any) => {
+    const searchStr = searchTerm.toLowerCase();
+    const matchesSearch = (
+      emp.first_name?.toLowerCase().includes(searchStr) ||
+      emp.last_name?.toLowerCase().includes(searchStr) ||
+      emp.employee_id?.toLowerCase().includes(searchStr) ||
+      emp.job_title?.toLowerCase().includes(searchStr)
+    );
+
+    const matchesDept = !filters.department || String(emp.department) === filters.department;
+    const matchesStatus = !filters.status || emp.status === filters.status;
+    const matchesType = !filters.type || emp.employment_type === filters.type;
+
+    return matchesSearch && matchesDept && matchesStatus && matchesType;
+  });
+
+  const activeFiltersCount = Object.values(filters).filter(v => v !== '').length;
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-8 pb-10 bg-slate-50/50 min-h-screen -m-6 p-6">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Employee Management</h1>
-          <p className="text-slate-500">View and manage your entire workforce here.</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Workforce Directory</h1>
+          <p className="text-sm font-medium text-slate-500 mt-1">Discover and connect with your organization's talent.</p>
         </div>
-        <Link 
+        <Link
           href="/employees/add"
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all shadow-sm"
+          className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-200 group"
         >
-          <Plus className="w-4 h-4" />
-          <span>Add Employee</span>
+          <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
+          <span>Onboard New Staff</span>
         </Link>
       </div>
 
-      {/* Filters & Search */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-center">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input 
-            type="text" 
-            placeholder="Search by name, ID, or email..." 
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+      {/* KPI Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatCard icon={<Users />} label="Headcount" value={stats.total} color="indigo" />
+        <StatCard icon={<UserCheck />} label="Active" value={stats.active} color="emerald" />
+        <StatCard icon={<Building2 />} label="Structure" value={`${stats.departments} Units`} color="amber" />
+      </div>
+
+      {/* Toolbar */}
+      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="relative flex-1 w-full max-w-lg">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search employees by name, ID, or job role..."
+            className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <button className="flex items-center justify-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all flex-1 md:flex-none">
+        <div className="flex items-center gap-3 w-full md:w-auto relative">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={cn(
+              "flex items-center justify-center gap-2 px-6 py-3 border rounded-2xl text-sm font-bold transition-all shadow-sm flex-1 md:flex-none",
+              activeFiltersCount > 0 ? "bg-indigo-50 border-indigo-200 text-indigo-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+            )}
+          >
             <Filter className="w-4 h-4" />
-            <span>Filters</span>
+            <span>Refine {activeFiltersCount > 0 && `(${activeFiltersCount})`}</span>
           </button>
+
+          {showFilters && (
+            <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 z-50 space-y-6 animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Filters</h4>
+                <button onClick={() => setShowFilters(false)}><X className="w-4 h-4 text-slate-300" /></button>
+              </div>
+              <div className="space-y-4">
+                <FilterSelect label="Department" value={filters.department} options={departments.map(d => ({ value: d.id, label: d.department_name }))} onChange={(val) => setFilters({ ...filters, department: val })} />
+                <FilterSelect label="Status" value={filters.status} options={[{ value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Inactive' }]} onChange={(val) => setFilters({ ...filters, status: val })} />
+              </div>
+              <button onClick={() => setFilters({ department: '', status: '', type: '' })} className="w-full py-2 text-[10px] font-black text-rose-500 uppercase tracking-widest hover:bg-rose-50 rounded-xl transition-colors">Clear All</button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Employee Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[400px] flex flex-col">
-        {loading ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-            <p className="font-medium">Loading workforce data...</p>
+      {/* Grid Content */}
+      {loading ? (
+        <div className="h-96 flex flex-col items-center justify-center gap-4">
+          <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
+          <p className="font-bold text-xs uppercase tracking-widest text-slate-400">Syncing Workforce...</p>
+        </div>
+      ) : filteredEmployees.length === 0 ? (
+        <div className="h-96 flex flex-col items-center justify-center text-center gap-4">
+          <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center"><Users className="w-8 h-8 text-slate-300" /></div>
+          <div>
+            <p className="text-xl font-black text-slate-900">No results found</p>
+            <p className="text-sm text-slate-500 mt-1">Try adjusting your filters or search term.</p>
           </div>
-        ) : employees.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-4 p-8 text-center">
-            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
-              <Users className="w-8 h-8 text-slate-400" />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-slate-900">No employees found</p>
-              <p className="text-sm max-w-xs mx-auto">Get started by adding your first employee to the system.</p>
-            </div>
-            <Link 
-              href="/employees/add"
-              className="text-indigo-600 font-bold hover:underline"
-            >
-              Add your first employee
-            </Link>
-          </div>
-        ) : (
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Employee</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ID</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Department</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contact</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {employees.map((emp) => (
-                  <tr key={emp.id} className="hover:bg-slate-50/50 transition-all cursor-pointer group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold uppercase">
-                          {emp.first_name[0]}{emp.last_name[0]}
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-900">{emp.first_name} {emp.last_name}</p>
-                          <p className="text-xs text-slate-500">{emp.job_title}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600 font-medium">
-                      {emp.employee_id}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5 text-sm text-slate-600">
-                        <Building2 className="w-4 h-4 text-slate-400" />
-                        {emp.department_name || 'N/A'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={cn(
-                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium uppercase tracking-tight",
-                        emp.status === 'ACTIVE' ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-amber-50 text-amber-700 border border-amber-100"
-                      )}>
-                        {emp.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3 text-slate-400">
-                        <span title={emp.email}><Mail className="w-4 h-4 hover:text-indigo-600 transition-colors" /></span>
-                        <Phone className="w-4 h-4 hover:text-indigo-600 transition-colors" />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all">
-                        <MoreVertical className="w-5 h-5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+          {filteredEmployees.map((emp) => (
+            <EmployeeCard key={emp.id} emp={emp} getAvatarUrl={getAvatarUrl} />
+          ))}
+        </div>
+      )}
 
-        {/* Pagination */}
-        {!loading && employees.length > 0 && (
-          <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between mt-auto">
-            <p className="text-sm text-slate-500">
-              Showing <span className="font-medium text-slate-900">{employees.length}</span> employees
-            </p>
-            <div className="flex items-center gap-2">
-              <button className="p-2 border border-slate-200 rounded-lg text-slate-400 hover:bg-white disabled:opacity-50" disabled>
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button className="p-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-white">
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
+      {/* Footer Stats */}
+      {!loading && (
+        <div className="flex justify-center pt-8">
+          <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">
+            End of Directory • <span className="text-slate-900">{filteredEmployees.length}</span> Results
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({ icon, label, value, color }: any) {
+  const colors: any = {
+    indigo: "bg-indigo-50 text-indigo-600 hover:border-indigo-200",
+    emerald: "bg-emerald-50 text-emerald-600 hover:border-emerald-200",
+    amber: "bg-amber-50 text-amber-600 hover:border-amber-200"
+  };
+  return (
+    <div className={cn("bg-white p-6 rounded-3xl border border-slate-200 shadow-sm transition-all group", colors[color])}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-white shadow-sm group-hover:scale-110 transition-transform">{icon}</div>
+        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">{label}</span>
       </div>
+      <h3 className="text-3xl font-black text-slate-900 tracking-tight">{value}</h3>
+    </div>
+  );
+}
+
+function EmployeeCard({ emp, getAvatarUrl }: any) {
+  return (
+    <div className="bg-white rounded-[2rem] border border-slate-100 p-6 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 transition-all group relative overflow-hidden flex flex-col h-full">
+      {/* Top: Name & Status */}
+      <div className="flex justify-between items-start mb-6">
+        <div className="text-left flex-1 min-w-0 pr-2">
+          <Link href={`/employees/${emp.id}`} className="block">
+            <h3 className="font-black text-slate-900 text-sm truncate group-hover:text-indigo-600 transition-colors">
+              {emp.first_name} {emp.last_name}
+            </h3>
+          </Link>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter truncate mt-0.5">{emp.job_title || 'New Member'}</p>
+        </div>
+        <span className={cn(
+          "px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest border",
+          emp.status === 'ACTIVE' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-slate-50 text-slate-400 border-slate-100"
+        )}>
+          {emp.status}
+        </span>
+      </div>
+
+      {/* Middle: Avatar */}
+      <Link href={`/employees/${emp.id}`} className="mb-6 flex justify-center relative">
+        <div className="w-24 h-24 rounded-full p-1 bg-white border border-slate-100 shadow-sm group-hover:border-indigo-100 transition-colors">
+          <div className="w-full h-full rounded-full overflow-hidden bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-2xl uppercase">
+            {emp.avatar ? (
+              <img src={getAvatarUrl(emp.avatar)} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+            ) : (
+              <span>{emp.first_name[0]}{emp.last_name ? emp.last_name[0] : ''}</span>
+            )}
+          </div>
+        </div>
+      </Link>
+
+      {/* Email */}
+      <p className="text-[11px] font-medium text-slate-400 mb-6 text-center truncate px-2">{emp.email}</p>
+
+      {/* Details Grid */}
+      <div className="space-y-4 mt-auto">
+        <DetailRow icon={<MapPin className="w-3 h-3" />} label="Location" value={`${emp.city || 'N/A'}, ${emp.country || 'USA'}`} />
+        <DetailRow icon={<Phone className="w-3 h-3" />} label="Contact" value={emp.phone_number || 'N/A'} />
+        <div className="flex justify-between items-center gap-2 pt-2 mt-2 border-t border-slate-50">
+           <Link href={`/employees/edit/${emp.id}`} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">Edit</Link>
+           <span className="text-[10px] font-bold text-slate-300 tracking-widest">{emp.employee_id}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailRow({ icon, label, value }: any) {
+  return (
+    <div className="flex justify-between items-center gap-4">
+      <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+        <span className="text-slate-300">{icon}</span>
+        {label}
+      </div>
+      <span className="text-[10px] font-bold text-slate-700 truncate max-w-[100px]">{value}</span>
+    </div>
+  );
+}
+
+function FilterSelect({ label, value, options, onChange }: any) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500/10"
+      >
+        <option value="">All {label}s</option>
+        {options.map((opt: any) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+      </select>
     </div>
   );
 }

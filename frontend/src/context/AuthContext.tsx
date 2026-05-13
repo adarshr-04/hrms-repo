@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 
@@ -10,6 +10,7 @@ interface AuthContextType {
   logout: () => void;
   loading: boolean;
   isAuthenticated: boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,14 +20,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      // In a real app, we might fetch user profile here
-      setUser({ name: 'Admin User' }); 
+  const fetchUserProfile = useCallback(async () => {
+    try {
+      const response = await api.get('/accounts/profile/');
+      setUser(response.data);
+    } catch (error) {
+      console.error("Failed to fetch user profile", error);
+      // If profile fetch fails, assume token is invalid
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      setUser(null);
     }
-    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        await fetchUserProfile();
+      }
+      setLoading(false);
+    };
+    initAuth();
+  }, [fetchUserProfile]);
 
   const login = async (credentials: any) => {
     const response = await api.post('/token/', credentials);
@@ -35,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('access_token', access);
     localStorage.setItem('refresh_token', refresh);
     
-    setUser({ name: 'Admin User' });
+    await fetchUserProfile();
     router.push('/');
   };
 
@@ -47,7 +63,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      logout, 
+      loading, 
+      isAuthenticated: !!user,
+      refreshUser: fetchUserProfile
+    }}>
       {children}
     </AuthContext.Provider>
   );

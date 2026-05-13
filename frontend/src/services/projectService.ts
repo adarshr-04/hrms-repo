@@ -1,38 +1,32 @@
 import api from '@/lib/api';
 
-export interface ProjectData {
-  project_name: string;
-  description: string;
-  start_date: string;
-  end_date?: string;
+export interface TaskLog {
+  id?: number | string;
+  date: string;
+  task_description: string;
   status: string;
-}
-
-export interface ProjectAssignmentData {
-  project: number | string;
-  employee: number | string;
-  role: string;
-  assigned_date: string;
+  owner: string;
+  remarks?: string;
 }
 
 export const projectService = {
-  getProjects: async (params?: any) => {
-    const response = await api.get('/projects/projects/', { params });
+  getTaskLogs: async () => {
+    const response = await api.get('/projects/task-logs/');
     return response.data;
   },
 
-  getAssignments: async (params?: any) => {
-    const response = await api.get('/projects/assignments/', { params });
+  createTaskLog: async (data: TaskLog) => {
+    const response = await api.post('/projects/task-logs/', data);
     return response.data;
   },
 
-  createProject: async (data: ProjectData) => {
-    const response = await api.post('/projects/projects/', data);
+  updateTaskLog: async (id: number | string, data: Partial<TaskLog>) => {
+    const response = await api.patch(`/projects/task-logs/${id}/`, data);
     return response.data;
   },
 
-  assignEmployee: async (data: ProjectAssignmentData) => {
-    const response = await api.post('/projects/assignments/', data);
+  deleteTaskLog: async (id: number | string) => {
+    const response = await api.delete(`/projects/task-logs/${id}/`);
     return response.data;
-  }
+  },
 };

@@ -3,14 +3,14 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Users, 
-  CalendarCheck, 
-  FileText, 
-  CreditCard, 
-  BarChart3, 
-  Briefcase, 
+import {
+  LayoutDashboard,
+  Users,
+  CalendarCheck,
+  FileText,
+  CreditCard,
+  BarChart3,
+  Briefcase,
   GraduationCap,
   UserPlus,
   Settings,
@@ -53,8 +53,8 @@ export function Sidebar() {
               href={item.href}
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group",
-                isActive 
-                  ? "bg-indigo-600/10 text-indigo-400 font-medium" 
+                isActive
+                  ? "bg-indigo-600/10 text-indigo-400 font-medium"
                   : "hover:bg-slate-800 hover:text-white"
               )}
             >
@@ -76,7 +76,7 @@ export function Sidebar() {
           <Settings className="w-5 h-5" />
           <span>Settings</span>
         </button>
-        <button 
+        <button
           onClick={logout}
           className="flex items-center gap-3 px-3 py-2 w-full text-red-400 hover:text-red-300 hover:bg-red-900/10 rounded-lg transition-all mt-1"
         >
