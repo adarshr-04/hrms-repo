@@ -59,5 +59,11 @@ class Application(models.Model):
     class Meta:
         unique_together = ('job', 'candidate')
 
+    def save(self, *args, **kwargs):
+        if self.status == 'HIRED':
+            self.job.status = 'CLOSED'
+            self.job.save()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.candidate} - {self.job.title}"
