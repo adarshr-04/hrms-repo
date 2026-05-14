@@ -25,10 +25,6 @@ export default function PayrollPage() {
   const [payrollData, setPayrollData] = useState<any[]>([]);
   const [stats, setStats] = useState({ totalNetPay: 0, totalBonus: 0, count: 0 });
 
-  useEffect(() => {
-    fetchPayroll();
-  }, []);
-
   const fetchPayroll = async () => {
     setLoading(true);
     try {
@@ -42,6 +38,10 @@ export default function PayrollPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchPayroll();
+  }, []);
 
   const formatCurrency = (amount: any) => {
     return new Intl.NumberFormat('en-IN', {
@@ -173,12 +173,12 @@ export default function PayrollPage() {
               <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center">
                 <CreditCard className="w-10 h-10 text-slate-300" />
               </div>
-              <div>
-                <p className="text-xl font-black text-slate-900 tracking-tight">Ledger is Empty</p>
-                <p className="text-sm font-medium text-slate-500 max-w-xs mx-auto mt-1">Initialize the current month's payroll cycle to see records and generate payslips.</p>
+                <div>
+                  <p className="text-xl font-black text-slate-900 tracking-tight">Ledger is Empty</p>
+                  <p className="text-sm font-medium text-slate-500 max-w-xs mx-auto mt-1">Initialize the current month&apos;s payroll cycle to see records and generate payslips.</p>
+                </div>
               </div>
-            </div>
-          ) : (
+            ) : (
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-200">
@@ -226,8 +226,8 @@ export default function PayrollPage() {
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

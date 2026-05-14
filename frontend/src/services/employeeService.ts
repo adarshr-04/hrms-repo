@@ -1,32 +1,18 @@
 import api from '@/lib/api';
 
-export interface EmployeeData {
-  first_name: string;
-  last_name: string;
-  email: string;
-  employee_id: string;
-  phone_number?: string;
-  date_of_birth?: string;
-  hire_date?: string;
-  job_title: string;
-  employment_type?: string;
-  status: string;
-  department?: number | string;
-  manager?: number | string;
-  alternative_email?: string;
-  alternative_phone_number?: string;
-  current_address?: string;
-  permanent_address?: string;
-  end_date?: string;
-}
+import { Employee, Department, PaginatedResponse } from '@/types';
+
+export type EmployeeData = Omit<Employee, 'id' | 'department_name' | 'manager_name' | 'created_at' | 'updated_at'>;
+
+export type ListResponse<T> = PaginatedResponse<T> | T[];
 
 export const employeeService = {
-  getAll: async (params?: any) => {
+  getAll: async (params?: any): Promise<ListResponse<Employee>> => {
     const response = await api.get('/employees/employees/', { params });
     return response.data;
   },
 
-  getById: async (id: number | string) => {
+  getById: async (id: number | string): Promise<Employee> => {
     const response = await api.get(`/employees/employees/${id}/`);
     return response.data;
   },
@@ -47,7 +33,7 @@ export const employeeService = {
     return response.data;
   },
 
-  getDepartments: async () => {
+  getDepartments: async (): Promise<Department[]> => {
     const response = await api.get('/employees/departments/');
     return response.data;
   },

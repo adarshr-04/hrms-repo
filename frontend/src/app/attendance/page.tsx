@@ -15,21 +15,26 @@ import {
 import { cn } from '@/lib/utils';
 import { attendanceService } from '@/services/attendanceService';
 import { format } from 'date-fns';
+import { useAuth } from '@/context/AuthContext';
 
 export default function AttendancePage() {
+  const { user, isAdmin, isManager } = useAuth();
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
-
-  useEffect(() => {
-    fetchAttendance();
-  }, [selectedDate]);
 
   const fetchAttendance = async () => {
     setLoading(true);
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const data = await attendanceService.getAll({ attendance_date: dateStr });
+      const params: Record<string, string | number> = { attendance_date: dateStr };
+      
+      // If not admin/manager, only fetch current user's attendance
+      if (!isAdmin && !isManager && user?.employee_id) {
+        params.employee = user.employee_id;
+      }
+      
+      const data = await attendanceService.getAll(params);
       setRecords(data.results || data);
     } catch (error) {
       console.error("Failed to fetch attendance", error);
@@ -37,6 +42,10 @@ export default function AttendancePage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void fetchAttendance();
+  }, [selectedDate, isAdmin, isManager, user?.employee_id]);
 
   const getStatusColor = (status: any) => {
     switch (status) {

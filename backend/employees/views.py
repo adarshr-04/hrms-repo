@@ -1,74 +1,172 @@
+from datetime import date
+
 from rest_framework import viewsets, parsers, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
 import pandas as pd
+
 from .models import Department, Employee
-from .serializers import (
-    DepartmentSerializer, 
-    EmployeeSerializer
-)
+from .serializers import DepartmentSerializer, EmployeeSerializer
+
 
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
+    permission_classes = [IsAuthenticated]
+
 
 class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.all()
     serializer_class = EmployeeSerializer
+    permission_classes = [IsAuthenticated]
     parser_classes = (parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser)
     filterset_fields = ['department', 'status', 'employment_type']
     search_fields = ['first_name', 'last_name', 'employee_id', 'email']
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        if not serializer.is_valid():
-            print("VALIDATION ERROR:", serializer.errors)
-        return super().create(request, *args, **kwargs)
+    # -------------------------------------------------------------------------
+    # Fix #9 — Soft delete: terminate instead of hard delete
+    # -------------------------------------------------------------------------
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Override DELETE to soft-delete the employee record.
+        Sets status to TERMINATED and records the end_date as today.
+        The record is preserved for audit trail and payroll history.
+        """
+        employee = self.get_object()
+        employee.status = 'TERMINATED'
+        employee.end_date = date.today()
+        employee.save(update_fields=['status', 'end_date', 'updated_at'])
+        return Response(
+            {
+                'message': (
+                    f'Employee {employee.employee_id} — '
+                    f'{employee.first_name} {employee.last_name or ""}'.strip()
+                    + ' has been terminated. Record preserved for audit.'
+                )
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    # -------------------------------------------------------------------------
+    # Fix #4, #5, #6 — Robust bulk import via serializer
+    # -------------------------------------------------------------------------
 
     @action(detail=False, methods=['post'], url_path='bulk-import')
     def bulk_import(self, request):
+        """
+        Import employees from a CSV or Excel file.
+
+        Required columns:  first_name, email
+        Optional columns:  last_name, employee_id, job_title, department,
+                           phone_number, hire_date, date_of_birth,
+                           employment_type, status, gender
+
+        Returns:
+            {
+                "created": <int>,
+                "skipped": <int>,
+                "errors": [{"row": <n>, "reason": "<msg>"}, ...]
+            }
+
+        HTTP 200 is returned for all partial or full success.
+        HTTP 400 is returned only when the file itself cannot be parsed.
+        """
         file = request.FILES.get('file')
         if not file:
-            return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'No file provided. Please upload a CSV or Excel file.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
+        # --- Parse the file ---------------------------------------------------
         try:
             if file.name.endswith('.csv'):
                 df = pd.read_csv(file)
-            else:
+            elif file.name.endswith(('.xlsx', '.xls')):
                 df = pd.read_excel(file)
+            else:
+                return Response(
+                    {'error': 'Unsupported file type. Upload a .csv, .xlsx, or .xls file.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        except Exception as exc:
+            return Response(
+                {'error': f'Could not parse file: {str(exc)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-            created_count = 0
-            errors = []
+        # Replace NaN/NaT with None so we can safely call .get() on rows
+        df = df.where(pd.notnull(df), None)
 
-            for index, row in df.iterrows():
-                try:
-                    # Get or create department by name
-                    dept_name = row.get('department')
-                    dept = None
-                    if dept_name:
-                        dept, _ = Department.objects.get_or_create(department_name=dept_name)
+        created_count = 0
+        skipped_count = 0
+        errors = []
 
-                    # Create employee
-                    Employee.objects.create(
-                        first_name=row.get('first_name'),
-                        last_name=row.get('last_name'),
-                        email=row.get('email'),
-                        employee_id=row.get('employee_id'),
-                        job_title=row.get('job_title', 'Employee'),
-                        department=dept,
-                        phone_number=row.get('phone_number'),
-                        hire_date=row.get('hire_date', '2024-01-01'),
-                        date_of_birth=row.get('date_of_birth', '1990-01-01'),
-                        status='ACTIVE'
-                    )
-                    created_count += 1
-                except Exception as e:
-                    errors.append(f"Row {index + 2}: {str(e)}")
+        for index, row in df.iterrows():
+            row_number = index + 2  # 1-based + header row
 
-            return Response({
-                "message": f"Successfully imported {created_count} employees",
-                "errors": errors
-            }, status=status.HTTP_201_CREATED)
+            # --- Resolve department by name (create if new) ---
+            dept_name = row.get('department')
+            dept_id = None
+            if dept_name:
+                dept_obj, _ = Department.objects.get_or_create(
+                    department_name=str(dept_name).strip()
+                )
+                dept_id = dept_obj.id
 
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            # --- Build the payload dict for the serializer ---
+            payload = {
+                'first_name': row.get('first_name'),
+                'last_name': row.get('last_name'),
+                'email': row.get('email'),
+                'phone_number': row.get('phone_number'),
+                'job_title': row.get('job_title'),
+                'employment_type': row.get('employment_type') or 'FULL_TIME',
+                'status': row.get('status') or 'ACTIVE',
+                'gender': row.get('gender'),
+                'department': dept_id,
+            }
+
+            # Only include date fields if they are actually present in the row.
+            # Never inject fake default dates.
+            if row.get('hire_date') is not None:
+                payload['hire_date'] = row.get('hire_date')
+            if row.get('date_of_birth') is not None:
+                payload['date_of_birth'] = row.get('date_of_birth')
+
+            # Include employee_id only if provided (otherwise auto-generate)
+            emp_id = row.get('employee_id')
+            if emp_id:
+                payload['employee_id'] = str(emp_id).strip()
+
+            # Remove None values so optional fields don't fail required checks
+            payload = {k: v for k, v in payload.items() if v is not None}
+
+            # --- Validate and create via serializer ---
+            serializer = EmployeeSerializer(data=payload)
+            if serializer.is_valid():
+                serializer.save()
+                created_count += 1
+            else:
+                skipped_count += 1
+                # Flatten all field-level errors into a single readable string
+                reason_parts = []
+                for field, messages in serializer.errors.items():
+                    msg = messages[0] if isinstance(messages, list) else str(messages)
+                    reason_parts.append(f'{field}: {msg}')
+                errors.append({
+                    'row': row_number,
+                    'reason': ' | '.join(reason_parts),
+                })
+
+        return Response(
+            {
+                'created': created_count,
+                'skipped': skipped_count,
+                'errors': errors,
+            },
+            status=status.HTTP_200_OK,
+        )

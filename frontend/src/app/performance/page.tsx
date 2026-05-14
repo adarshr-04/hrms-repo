@@ -19,10 +19,6 @@ export default function PerformancePage() {
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState<any[]>([]);
 
-  useEffect(() => {
-    fetchReviews();
-  }, []);
-
   const fetchReviews = async () => {
     setLoading(true);
     try {
@@ -34,6 +30,10 @@ export default function PerformancePage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchReviews();
+  }, []);
 
   const renderStars = (rating: any) => {
     return (
@@ -123,7 +123,7 @@ export default function PerformancePage() {
                   <div className="relative">
                     <MessageSquare className="absolute -left-6 top-1 w-4 h-4 text-slate-200" />
                     <p className="text-sm text-slate-600 italic leading-relaxed">
-                      "{review.comments}"
+                      &ldquo;{review.comments}&rdquo;
                     </p>
                   </div>
                 </div>

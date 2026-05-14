@@ -11,11 +11,6 @@ export default function TrackerPage() {
     const [saving, setSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
-    // Load data from Backend
-    useEffect(() => {
-        fetchTasks();
-    }, []);
-
     const fetchTasks = async () => {
         setLoading(true);
         try {
@@ -41,6 +36,11 @@ export default function TrackerPage() {
             setLoading(false);
         }
     };
+
+    // Load data from Backend
+    useEffect(() => {
+        fetchTasks();
+    }, []);
 
     const handleAddTask = () => {
         const newTask = {

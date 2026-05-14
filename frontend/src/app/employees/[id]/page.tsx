@@ -21,7 +21,9 @@ import {
   User,
   ExternalLink,
   Edit,
-  Trash2
+  Trash2,
+  Plus,
+  UserCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { employeeService } from '@/services/employeeService';
@@ -33,12 +35,6 @@ export default function EmployeeProfilePage() {
   const [employee, setEmployee] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
-
-  useEffect(() => {
-    if (params.id) {
-      fetchEmployee();
-    }
-  }, [params.id]);
 
   const fetchEmployee = async () => {
     setLoading(true);
@@ -54,8 +50,14 @@ export default function EmployeeProfilePage() {
     }
   };
 
+  useEffect(() => {
+    if (params.id) {
+      fetchEmployee();
+    }
+  }, [params.id]);
+
   const getAvatarUrl = (path: string) => {
-    if (!path) return null;
+    if (!path) return undefined;
     if (path.startsWith('http')) return path;
     const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
     return `${baseUrl}${path}`;

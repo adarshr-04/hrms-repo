@@ -26,14 +26,15 @@ import { cn } from '@/lib/utils';
 import { employeeService } from '@/services/employeeService';
 import { toast } from 'sonner';
 
-export default function EditEmployeePage() {
-  const params = useParams();
+import { Employee, Department } from '@/types';
+
+export default function EditEmployee({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [managers, setManagers] = useState<any[]>([]);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [managers, setManagers] = useState<Employee[]>([]);
+  const [avatarPreview, setAvatarPreview] = useState<string | undefined>(undefined);
 
   const { register, handleSubmit, setValue, watch, formState: { errors }, setError } = useForm();
 
@@ -51,16 +52,17 @@ export default function EditEmployeePage() {
       ]);
 
       setDepartments(depts);
-      setManagers((emps.results || emps).filter((e: any) => String(e.id) !== String(params.id)));
+      const employeeList = Array.isArray(emps) ? emps : emps.results;
+      setManagers(employeeList.filter((e) => String(e.id) !== String(params.id)));
 
       // Pre-fill the form with COMPLETE employee data
       const data = currentEmp;
       Object.keys(data).forEach(key => {
-        if (key === 'avatar' && data[key]) {
+        if (key === 'avatar' && (data as any)[key]) {
           const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
-          setAvatarPreview(`${baseUrl}${data[key]}`);
+          setAvatarPreview(`${baseUrl}${(data as any)[key]}`);
         } else {
-          setValue(key, data[key]);
+          setValue(key as any, (data as any)[key]);
         }
       });
 
@@ -168,7 +170,7 @@ export default function EditEmployeePage() {
               <FormInput label="First Name" name="first_name" register={register} error={errors.first_name} required />
               <FormInput label="Last Name" name="last_name" register={register} error={errors.last_name} required />
               <FormInput label="Date of Birth" name="date_of_birth" type="date" register={register} error={errors.date_of_birth} />
-              <FormInput label="Unique Employee ID" name="employee_id" register={register} error={errors.employee_id} required />
+              <FormInput label="Unique Employee ID" name="employee_id" register={register} error={errors.employee_id} required readOnly />
             </div>
           </FormSection>
 
@@ -214,7 +216,15 @@ export default function EditEmployeePage() {
               </div>
 
               <FormInput label="Commission Date (Hire Date)" name="hire_date" type="date" register={register} error={errors.hire_date} />
-              <FormInput label="Current Engagement Status" name="status" register={register} error={errors.status} required />
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Current Engagement Status</label>
+                <select {...register('status', { required: true })} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium outline-none">
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                  <option value="TERMINATED">Terminated</option>
+                  <option value="ON_LEAVE">On Leave</option>
+                </select>
+              </div>
             </div>
           </FormSection>
 
@@ -263,7 +273,7 @@ function FormSection({ title, icon, children }: any) {
   );
 }
 
-function FormInput({ label, name, register, error, type = "text", required = false }: any) {
+function FormInput({ label, name, register, error, type = "text", required = false, readOnly = false }: any) {
   return (
     <div className="space-y-1.5">
       <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">
@@ -272,9 +282,11 @@ function FormInput({ label, name, register, error, type = "text", required = fal
       <input
         type={type}
         {...register(name, { required })}
+        readOnly={readOnly}
         className={cn(
           "w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-slate-900/5 transition-all",
-          error && "border-rose-200 bg-rose-50/30 text-rose-900"
+          error && "border-rose-200 bg-rose-50/30 text-rose-900",
+          readOnly && "opacity-60 cursor-not-allowed"
         )}
       />
       {error && <p className="text-[9px] font-bold text-rose-500 uppercase tracking-widest mt-1 ml-1">{error.message || 'Required'}</p>}

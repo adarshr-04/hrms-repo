@@ -6,6 +6,7 @@ import {
   Calendar,
   Clock,
   Briefcase,
+  GraduationCap,
   ArrowUpRight,
   ArrowDownRight,
   Plus,
@@ -20,40 +21,48 @@ import {
 import { employeeService } from '@/services/employeeService';
 import { attendanceService } from '@/services/attendanceService';
 import { payrollService } from '@/services/payrollService';
+import { useAuth } from '@/context/AuthContext';
 
 const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 export default function DashboardPage() {
+  const { user, isAdmin, isManager } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any[]>([]);
   const [deptData, setDeptData] = useState<any[]>([]);
   const [attendanceTrend, setAttendanceTrend] = useState<any[]>([]);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const employees = await employeeService.getAll();
-      const empList = employees.results || employees;
+      if (isAdmin || isManager) {
+        const employees = await employeeService.getAll();
+        const empList = Array.isArray(employees) ? employees : (employees.results || []);
 
-      // Calculate Stats
-      setStats([
-        { name: 'Total Employees', value: empList.length, change: '+12%', trend: 'up', icon: Users, color: 'bg-blue-500' },
-        { name: 'Present Today', value: empList.filter((e: any) => e.status === 'ACTIVE').length, change: '+5%', trend: 'up', icon: Calendar, color: 'bg-emerald-500' },
-        { name: 'Pending Leaves', value: '0', change: '-2', trend: 'down', icon: Clock, color: 'bg-amber-500' },
-        { name: 'Active Projects', value: '0', change: '+0', trend: 'up', icon: Briefcase, color: 'bg-indigo-500' },
-      ]);
+        // Calculate Stats
+        setStats([
+          { name: 'Total Employees', value: empList.length, change: '+12%', trend: 'up', icon: Users, color: 'bg-blue-500' },
+          { name: 'Present Today', value: empList.filter((e: any) => e.status === 'ACTIVE').length, change: '+5%', trend: 'up', icon: Calendar, color: 'bg-emerald-500' },
+          { name: 'Pending Leaves', value: '0', change: '-2', trend: 'down', icon: Clock, color: 'bg-amber-500' },
+          { name: 'Active Projects', value: '0', change: '+0', trend: 'up', icon: Briefcase, color: 'bg-indigo-500' },
+        ]);
 
-      // Calculate Department Breakdown
-      const depts = empList.reduce((acc: any, curr: any) => {
-        const name = curr.department_name || 'Unassigned';
-        acc[name] = (acc[name] || 0) + 1;
-        return acc;
-      }, {});
-      setDeptData(Object.keys(depts).map(name => ({ name, value: depts[name] })));
+        // Calculate Department Breakdown
+        const depts = empList.reduce((acc: any, curr: any) => {
+          const name = curr.department_name || 'Unassigned';
+          acc[name] = (acc[name] || 0) + 1;
+          return acc;
+        }, {});
+        setDeptData(Object.keys(depts).map(name => ({ name, value: depts[name] })));
+      } else {
+        // Personal Dashboard for Employee
+        setStats([
+          { name: 'My Attendance', value: '98%', change: 'Steady', trend: 'up', icon: Calendar, color: 'bg-emerald-500' },
+          { name: 'Leave Balance', value: '12 Days', change: 'Available', trend: 'up', icon: Clock, color: 'bg-amber-500' },
+          { name: 'My Projects', value: '2 Active', change: 'On track', trend: 'up', icon: Briefcase, color: 'bg-indigo-500' },
+          { name: 'Training Progress', value: '75%', change: '+5%', trend: 'up', icon: GraduationCap, color: 'bg-blue-500' },
+        ]);
+      }
 
       // Mock Attendance Trend
       setAttendanceTrend([
@@ -71,11 +80,15 @@ export default function DashboardPage() {
     }
   };
 
+  useEffect(() => {
+    fetchDashboardData();
+  }, [isAdmin, isManager]);
+
   if (loading) {
     return (
       <div className="h-[70vh] flex flex-col items-center justify-center text-slate-500 gap-4">
         <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
-        <p className="font-bold">Generating organizational insights...</p>
+        <p className="font-bold">Syncing your dashboard...</p>
       </div>
     );
   }
@@ -84,8 +97,12 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard Overview</h1>
-          <p className="text-slate-500">Real-time organizational analytics and workforce tracking.</p>
+          <h1 className="text-2xl font-bold text-slate-900">
+            {isAdmin ? 'Organizational Overview' : isManager ? 'Department Insights' : `Welcome Back, ${user?.first_name}`}
+          </h1>
+          <p className="text-slate-500">
+            {isAdmin ? 'Real-time organizational analytics and workforce tracking.' : 'Here is what is happening with your schedule today.'}
+          </p>
         </div>
         <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all shadow-sm">
           <Plus className="w-4 h-4" />

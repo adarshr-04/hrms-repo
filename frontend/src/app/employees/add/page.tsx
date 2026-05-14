@@ -81,7 +81,7 @@ export default function AddEmployeePage() {
   const [importing, setImporting] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | undefined>(undefined);
   const [departments, setDepartments] = useState<any[]>([]);
 
   const { register, handleSubmit, setError, formState: { errors } } = useForm<EmployeeFormData>({
@@ -99,9 +99,8 @@ export default function AddEmployeePage() {
   useEffect(() => {
     async function loadInitialData() {
       try {
-        const deptData = await employeeService.getDepartments();
-        const depts = Array.isArray(deptData) ? deptData : deptData.results || [];
-        setDepartments(depts.map((d: any) => ({ label: d.department_name, value: d.id })));
+        const depts = await employeeService.getDepartments();
+        setDepartments(depts.map((d) => ({ label: d.department_name, value: d.id })));
       } catch (error) {
         console.error("Failed to load organizational data", error);
         toast.error("Could not load departments");

@@ -25,7 +25,10 @@ SECRET_KEY = 'django-insecure-p)56=220*m5g@l+jrd=)nx#xp@gv_bbids7u@2_n-*%%tp45)w
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+]
 
 
 # Application definition
@@ -139,6 +142,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # CORS Settings (allow Next.js frontend)
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
+    'http://127.0.0.1:3000',
 ]
 
 # REST Framework

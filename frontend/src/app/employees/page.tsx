@@ -25,36 +25,34 @@ import {
 import { cn } from '@/lib/utils';
 import { employeeService } from '@/services/employeeService';
 import { toast } from 'sonner';
+import { useAuth } from '@/context/AuthContext';
+import { Employee, Department } from '@/types';
 
 export default function EmployeesPage() {
+  const { isAdmin } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  const [employees, setEmployees] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ total: 0, active: 0, departments: 0 });
   const [showFilters, setShowFilters] = useState(false);
-  const [departments, setDepartments] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [filters, setFilters] = useState({
     department: '',
     status: '',
     type: ''
   });
 
-  useEffect(() => {
-    fetchEmployees();
-    fetchDepartments();
-  }, []);
-
   const fetchEmployees = async () => {
     setLoading(true);
     try {
       const data = await employeeService.getAll();
-      const results = data.results || data;
+      const results: Employee[] = Array.isArray(data) ? data : (data?.results ?? []);
       setEmployees(results);
 
       setStats({
         total: results.length,
-        active: results.filter((e: any) => e.status === 'ACTIVE').length,
-        departments: new Set(results.map((e: any) => e.department)).size
+        active: results.filter(e => e.status === 'ACTIVE').length,
+        departments: new Set(results.map(e => e.department)).size
       });
     } catch (error) {
       console.error("Failed to fetch employees", error);
@@ -66,11 +64,16 @@ export default function EmployeesPage() {
   const fetchDepartments = async () => {
     try {
       const data = await employeeService.getDepartments();
-      setDepartments(data);
+      setDepartments(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch departments", error);
     }
   };
+
+  useEffect(() => {
+    fetchEmployees();
+    fetchDepartments();
+  }, []);
 
   const getAvatarUrl = (path: string) => {
     if (!path) return null;
@@ -79,7 +82,7 @@ export default function EmployeesPage() {
     return `${baseUrl}${path}`;
   };
 
-  const filteredEmployees = employees.filter((emp: any) => {
+  const filteredEmployees = employees.filter(emp => {
     const searchStr = searchTerm.toLowerCase();
     const matchesSearch = (
       emp.first_name?.toLowerCase().includes(searchStr) ||
@@ -103,15 +106,17 @@ export default function EmployeesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Workforce Directory</h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">Discover and connect with your organization's talent.</p>
+          <p className="text-sm font-medium text-slate-500 mt-1">Discover and connect with your organization&apos;s talent.</p>
         </div>
-        <Link
-          href="/employees/add"
-          className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-200 group"
-        >
-          <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
-          <span>Onboard New Staff</span>
-        </Link>
+        {isAdmin && (
+          <Link
+            href="/employees/add"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-200 group"
+          >
+            <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
+            <span>Onboard New Staff</span>
+          </Link>
+        )}
       </div>
 
       {/* KPI Stats Grid */}
@@ -152,8 +157,8 @@ export default function EmployeesPage() {
                 <button onClick={() => setShowFilters(false)}><X className="w-4 h-4 text-slate-300" /></button>
               </div>
               <div className="space-y-4">
-                <FilterSelect label="Department" value={filters.department} options={departments.map(d => ({ value: d.id, label: d.department_name }))} onChange={(val) => setFilters({ ...filters, department: val })} />
-                <FilterSelect label="Status" value={filters.status} options={[{ value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Inactive' }]} onChange={(val) => setFilters({ ...filters, status: val })} />
+                <FilterSelect label="Department" value={filters.department} options={departments.map(d => ({ value: d.id, label: d.department_name }))} onChange={(val: string) => setFilters({ ...filters, department: val })} />
+                <FilterSelect label="Status" value={filters.status} options={[{ value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Inactive' }]} onChange={(val: string) => setFilters({ ...filters, status: val })} />
               </div>
               <button onClick={() => setFilters({ department: '', status: '', type: '' })} className="w-full py-2 text-[10px] font-black text-rose-500 uppercase tracking-widest hover:bg-rose-50 rounded-xl transition-colors">Clear All</button>
             </div>
@@ -178,7 +183,7 @@ export default function EmployeesPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
           {filteredEmployees.map((emp) => (
-            <EmployeeCard key={emp.id} emp={emp} getAvatarUrl={getAvatarUrl} />
+            <EmployeeCard key={emp.id} emp={emp} getAvatarUrl={getAvatarUrl} isAdmin={isAdmin} />
           ))}
         </div>
       )}
@@ -212,7 +217,7 @@ function StatCard({ icon, label, value, color }: any) {
   );
 }
 
-function EmployeeCard({ emp, getAvatarUrl }: any) {
+function EmployeeCard({ emp, getAvatarUrl, isAdmin }: any) {
   return (
     <div className="bg-white rounded-[2rem] border border-slate-100 p-6 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 transition-all group relative overflow-hidden flex flex-col h-full">
       {/* Top: Name & Status */}
@@ -254,8 +259,10 @@ function EmployeeCard({ emp, getAvatarUrl }: any) {
         <DetailRow icon={<MapPin className="w-3 h-3" />} label="Location" value={`${emp.city || 'N/A'}, ${emp.country || 'USA'}`} />
         <DetailRow icon={<Phone className="w-3 h-3" />} label="Contact" value={emp.phone_number || 'N/A'} />
         <div className="flex justify-between items-center gap-2 pt-2 mt-2 border-t border-slate-50">
-           <Link href={`/employees/edit/${emp.id}`} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">Edit</Link>
-           <span className="text-[10px] font-bold text-slate-300 tracking-widest">{emp.employee_id}</span>
+           {isAdmin && (
+             <Link href={`/employees/edit/${emp.id}`} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">Edit</Link>
+           )}
+           <span className="text-[10px] font-bold text-slate-300 tracking-widest ml-auto">{emp.employee_id}</span>
         </div>
       </div>
     </div>

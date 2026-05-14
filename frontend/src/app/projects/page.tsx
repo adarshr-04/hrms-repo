@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Briefcase, 
   Users, 
@@ -21,11 +21,7 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<any[]>([]);
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     setLoading(true);
     try {
       const data = await projectService.getProjects();
@@ -35,7 +31,11 @@ export default function ProjectsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void fetchProjects();
+  }, [fetchProjects]);
 
   const getStatusColor = (status: any) => {
     switch (status) {
@@ -70,7 +70,7 @@ export default function ProjectsPage() {
             <FolderDot className="w-12 h-12 text-slate-300" />
             <div>
               <p className="text-lg font-bold text-slate-900">No projects found</p>
-              <p className="text-sm max-w-xs mx-auto">Click 'Launch Project' to start tracking your first organizational initiative.</p>
+              <p className="text-sm max-w-xs mx-auto">Click &apos;Launch Project&apos; to start tracking your first organizational initiative.</p>
             </div>
           </div>
         ) : (
