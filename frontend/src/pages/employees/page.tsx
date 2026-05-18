@@ -1,7 +1,6 @@
-"use client";
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import {
   Plus,
   Search,
@@ -78,7 +77,7 @@ export default function EmployeesPage() {
   const getAvatarUrl = (path: string) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
+    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
     return `${baseUrl}${path}`;
   };
 
@@ -109,8 +108,7 @@ export default function EmployeesPage() {
           <p className="text-sm font-medium text-slate-500 mt-1">Discover and connect with your organization&apos;s talent.</p>
         </div>
         {isAdmin && (
-          <Link
-            href="/employees/add"
+          <Link to="/employees/add"
             className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-200 group"
           >
             <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
@@ -223,7 +221,7 @@ function EmployeeCard({ emp, getAvatarUrl, isAdmin }: any) {
       {/* Top: Name & Status */}
       <div className="flex justify-between items-start mb-6">
         <div className="text-left flex-1 min-w-0 pr-2">
-          <Link href={`/employees/${emp.id}`} className="block">
+          <Link to={`/employees/details?id=${emp.id}`} className="block">
             <h3 className="font-black text-slate-900 text-sm truncate group-hover:text-indigo-600 transition-colors">
               {emp.first_name} {emp.last_name}
             </h3>
@@ -239,7 +237,7 @@ function EmployeeCard({ emp, getAvatarUrl, isAdmin }: any) {
       </div>
 
       {/* Middle: Avatar */}
-      <Link href={`/employees/${emp.id}`} className="mb-6 flex justify-center relative">
+      <Link to={`/employees/details?id=${emp.id}`} className="mb-6 flex justify-center relative">
         <div className="w-24 h-24 rounded-full p-1 bg-white border border-slate-100 shadow-sm group-hover:border-indigo-100 transition-colors">
           <div className="w-full h-full rounded-full overflow-hidden bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-2xl uppercase">
             {emp.avatar ? (
@@ -260,7 +258,7 @@ function EmployeeCard({ emp, getAvatarUrl, isAdmin }: any) {
         <DetailRow icon={<Phone className="w-3 h-3" />} label="Contact" value={emp.phone_number || 'N/A'} />
         <div className="flex justify-between items-center gap-2 pt-2 mt-2 border-t border-slate-50">
            {isAdmin && (
-             <Link href={`/employees/edit/${emp.id}`} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">Edit</Link>
+             <Link to={`/employees/edit?id=${emp.id}`} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">Edit</Link>
            )}
            <span className="text-[10px] font-bold text-slate-300 tracking-widest ml-auto">{emp.employee_id}</span>
         </div>

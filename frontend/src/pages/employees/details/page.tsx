@@ -1,8 +1,7 @@
-"use client";
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { 
   ArrowLeft, 
   Mail, 
@@ -30,8 +29,9 @@ import { employeeService } from '@/services/employeeService';
 import { toast } from 'sonner';
 
 export default function EmployeeProfilePage() {
-  const params = useParams();
-  const router = useRouter();
+  const [searchParams] = useSearchParams();
+  const id = searchParams.get('id');
+  const navigate = useNavigate();
   const [employee, setEmployee] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
@@ -39,36 +39,37 @@ export default function EmployeeProfilePage() {
   const fetchEmployee = async () => {
     setLoading(true);
     try {
-      const data = await employeeService.getById(params.id as string);
+      if (!id) return;
+      const data = await employeeService.getById(id as string);
       setEmployee(data);
     } catch (error) {
       console.error("Failed to fetch employee", error);
       toast.error("Employee profile not found");
-      router.push('/employees');
+      navigate('/employees');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (params.id) {
+    if (id) {
       fetchEmployee();
     }
-  }, [params.id]);
+  }, [id]);
 
   const getAvatarUrl = (path: string) => {
     if (!path) return undefined;
     if (path.startsWith('http')) return path;
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
+    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
     return `${baseUrl}${path}`;
   };
 
   const handleDelete = async () => {
     if (window.confirm("Are you sure you want to remove this personnel record from the active registry? This action is logged for audit purposes.")) {
       try {
-        await employeeService.delete(params.id as string);
+        await employeeService.delete(id as string);
         toast.success("Personnel record archived successfully");
-        router.push('/employees');
+        navigate('/employees');
       } catch (error) {
         console.error("Deletion failed", error);
         toast.error("Failed to archive record. Permission denied or server error.");
@@ -91,13 +92,12 @@ export default function EmployeeProfilePage() {
     <div className="space-y-10 pb-20 bg-[#FAFAFA] min-h-screen -m-6 p-10">
       {/* Back & Actions */}
       <div className="flex items-center justify-between">
-        <Link href="/employees" className="group flex items-center gap-2 text-slate-400 hover:text-slate-900 transition-colors">
+        <Link to="/employees" className="group flex items-center gap-2 text-slate-400 hover:text-slate-900 transition-colors">
           <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
           <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Return to Registry</span>
         </Link>
         <div className="flex items-center gap-3">
-          <Link 
-            href={`/employees/edit/${params.id}`}
+          <Link to={`/employees/edit?id=${id}`}
             className="flex items-center gap-2 px-6 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
           >
             <Edit className="w-3.5 h-3.5" />

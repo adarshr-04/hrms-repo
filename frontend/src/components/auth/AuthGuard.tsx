@@ -1,7 +1,6 @@
-"use client";
 
 import { useAuth } from "@/context/AuthContext";
-import { useRouter, usePathname } from "next/navigation";
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useEffect } from "react";
 import MainLayout from "../layout/MainLayout";
 import { Loader2 } from "lucide-react";
@@ -10,22 +9,22 @@ import { isRouteAllowed } from "@/auth/routeAccess";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading, user } = useAuth();
-  const router = useRouter();
-  const pathname = usePathname();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    if (!loading && !isAuthenticated && pathname !== '/login') {
-      router.push('/login');
+    if (!loading && !isAuthenticated && location.pathname !== '/login') {
+      navigate('/login');
     }
-  }, [isAuthenticated, loading, pathname, router]);
+  }, [isAuthenticated, loading, location.pathname, navigate]);
 
   useEffect(() => {
-    if (loading || !isAuthenticated || pathname === "/login") return;
+    if (loading || !isAuthenticated || location.pathname === "/login") return;
     const role = user?.role ?? "EMPLOYEE";
-    if (!isRouteAllowed(pathname, role)) {
-      router.replace("/");
+    if (!isRouteAllowed(location.pathname, role)) {
+      navigate("/");
     }
-  }, [isAuthenticated, loading, pathname, router, user?.role]);
+  }, [isAuthenticated, loading, location.pathname, navigate, user?.role]);
 
   if (loading) {
     return (
@@ -36,7 +35,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   // If we are on the login page, just show the login page without the layout
-  if (pathname === '/login') {
+  if (location.pathname === '/login') {
     return (
       <>
         {children}

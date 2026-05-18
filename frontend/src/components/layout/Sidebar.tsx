@@ -1,8 +1,7 @@
-"use client";
 
 import React from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Link } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -32,7 +31,7 @@ const navItems = [
 ];
 
 export function Sidebar() {
-  const pathname = usePathname();
+  const location = useLocation();
   const { logout, user } = useAuth();
   const userRole = user?.role || 'EMPLOYEE';
 
@@ -49,11 +48,10 @@ export function Sidebar() {
 
       <nav className="flex-1 px-4 space-y-1">
         {filteredNavItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+          const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
           return (
-            <Link
-              key={item.name}
-              href={item.href}
+            <Link key={item.name}
+              to={item.href}
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group",
                 isActive
@@ -79,16 +77,16 @@ export function Sidebar() {
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Logged in as</p>
           <p className="text-xs font-bold text-indigo-400 truncate">{user?.first_name} ({userRole})</p>
         </div>
-        <button className="flex items-center gap-3 px-3 py-2 w-full text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all">
-          <Settings className="w-5 h-5" />
-          <span>Settings</span>
-        </button>
         <button
           onClick={logout}
-          className="flex items-center gap-3 px-3 py-2 w-full text-red-400 hover:text-red-300 hover:bg-red-900/10 rounded-lg transition-all mt-1"
+          className="flex items-center gap-3 px-3 py-2 w-full text-red-400 hover:text-red-300 hover:bg-red-900/10 rounded-lg transition-all"
         >
           <LogOut className="w-5 h-5" />
           <span>Logout</span>
+        </button>
+        <button className="flex items-center gap-3 px-3 py-2 w-full text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all mt-1">
+          <Settings className="w-5 h-5" />
+          <span>Settings</span>
         </button>
       </div>
     </div>

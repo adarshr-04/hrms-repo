@@ -1,7 +1,6 @@
-"use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import api from '@/lib/api';
 import { User } from '@/types';
 
@@ -24,7 +23,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const fetchUserProfile = useCallback(async () => {
     try {
@@ -64,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('refresh_token', refresh);
 
       await fetchUserProfile();
-      router.push('/');
+      navigate('/');
     } catch (error) {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
@@ -77,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     setUser(null);
-    router.push('/login');
+    navigate('/login');
   };
 
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';

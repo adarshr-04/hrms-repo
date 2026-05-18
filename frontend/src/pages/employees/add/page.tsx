@@ -1,7 +1,6 @@
-"use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useForm, FieldError, UseFormRegisterReturn } from "react-hook-form";
 import { 
   Save, User, Lightbulb, Loader2, Camera, ChevronDown, ArrowRight, MapPin, Mail, Phone, Briefcase, FileSpreadsheet, Download, Upload, Building2
@@ -75,7 +74,7 @@ const VALIDATION_RULES = {
  * MAIN COMPONENT 
  */
 export default function AddEmployeePage() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -139,7 +138,7 @@ export default function AddEmployeePage() {
 
       await employeeService.create(formData);
       toast.success("Employee onboarded successfully");
-      router.push("/employees");
+      navigate("/employees");
     } catch (error: any) {
       console.error("Submission Error Response:", error.response?.data);
       
@@ -189,7 +188,7 @@ export default function AddEmployeePage() {
         console.warn("Import errors:", result.errors);
         toast.warning(`Some rows were skipped (${result.errors.length} errors)`);
       }
-      router.push("/employees");
+      navigate("/employees");
     } catch (error: any) {
       toast.error(error.response?.data?.error || "Bulk import failed");
     } finally {
@@ -375,7 +374,7 @@ export default function AddEmployeePage() {
 
           {/* FOOTER */}
           <div className="flex items-center justify-end gap-6 border-t border-slate-100 bg-slate-50/80 px-12 py-8">
-            <button type="button" onClick={() => router.back()} className="text-sm font-bold text-slate-400 transition-colors hover:text-slate-700">Cancel</button>
+            <button type="button" onClick={() => navigate(-1)} className="text-sm font-bold text-slate-400 transition-colors hover:text-slate-700">Cancel</button>
             <div className="flex items-center gap-4">
               <button type="submit" disabled={loading} className="group flex h-12 items-center gap-3 rounded-xl bg-indigo-600 px-8 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition-all hover:bg-indigo-700 disabled:opacity-50">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

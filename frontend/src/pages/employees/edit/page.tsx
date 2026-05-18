@@ -1,8 +1,7 @@
-"use client";
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
   Save,
@@ -28,8 +27,10 @@ import { toast } from 'sonner';
 
 import { Employee, Department } from '@/types';
 
-export default function EditEmployee({ params }: { params: { id: string } }) {
-  const router = useRouter();
+export default function EditEmployee() {
+  const [searchParams] = useSearchParams();
+  const id = searchParams.get('id');
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -40,7 +41,7 @@ export default function EditEmployee({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     fetchInitialData();
-  }, [params.id]);
+  }, [id]);
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -48,18 +49,18 @@ export default function EditEmployee({ params }: { params: { id: string } }) {
       const [depts, emps, currentEmp] = await Promise.all([
         employeeService.getDepartments(),
         employeeService.getAll(),
-        employeeService.getById(params.id as string)
+        employeeService.getById(id as string)
       ]);
 
       setDepartments(depts);
       const employeeList = Array.isArray(emps) ? emps : emps.results;
-      setManagers(employeeList.filter((e) => String(e.id) !== String(params.id)));
+      setManagers(employeeList.filter((e) => String(e.id) !== String(id)));
 
       // Pre-fill the form with COMPLETE employee data
       const data = currentEmp;
       Object.keys(data).forEach(key => {
         if (key === 'avatar' && (data as any)[key]) {
-          const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
+          const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
           setAvatarPreview(`${baseUrl}${(data as any)[key]}`);
         } else {
           setValue(key as any, (data as any)[key]);
@@ -69,7 +70,7 @@ export default function EditEmployee({ params }: { params: { id: string } }) {
     } catch (error) {
       console.error("Failed to load edit data", error);
       toast.error("Failed to load personnel data");
-      router.push('/employees');
+      navigate('/employees');
     } finally {
       setLoading(false);
     }
@@ -99,9 +100,9 @@ export default function EditEmployee({ params }: { params: { id: string } }) {
         }
       });
 
-      await employeeService.update(params.id as string, formData);
+      await employeeService.update(id as string, formData);
       toast.success("Personnel record updated successfully");
-      router.push(`/employees/${params.id}`);
+      navigate(`/employees/details?id=${id}`);
     } catch (error: any) {
       console.error("Update failed", error);
       if (error.response?.data) {
@@ -130,7 +131,7 @@ export default function EditEmployee({ params }: { params: { id: string } }) {
   return (
     <div className="space-y-10 pb-20 bg-[#FAFAFA] min-h-screen -m-6 p-10">
       <div className="flex items-center justify-between">
-        <Link href={`/employees/${params.id}`} className="group flex items-center gap-2 text-slate-400 hover:text-slate-900 transition-colors">
+        <Link to={`/employees/details?id=${id}`} className="group flex items-center gap-2 text-slate-400 hover:text-slate-900 transition-colors">
           <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
           <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Exit Edit Mode</span>
         </Link>
@@ -243,7 +244,7 @@ export default function EditEmployee({ params }: { params: { id: string } }) {
           </FormSection>
 
           <div className="flex items-center justify-end gap-4 pt-10 border-t border-slate-200/60">
-            <Link href={`/employees/${params.id}`} className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Discard Modifications</Link>
+            <Link to={`/employees/details?id=${id}`} className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Discard Modifications</Link>
             <button
               type="submit"
               disabled={saving}
