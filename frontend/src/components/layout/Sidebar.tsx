@@ -19,15 +19,15 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 
 const navItems = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ADMIN', 'DEPT_MANAGER', 'EMPLOYEE'] },
-  { name: 'Employees', href: '/employees', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'DEPT_MANAGER', 'EMPLOYEE'] },
-  { name: 'Attendance', href: '/attendance', icon: CalendarCheck, roles: ['SUPER_ADMIN', 'ADMIN', 'DEPT_MANAGER', 'EMPLOYEE'] },
-  { name: 'Leaves', href: '/leaves', icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'DEPT_MANAGER', 'EMPLOYEE'] },
-  { name: 'Payroll', href: '/payroll', icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN'] },
-  { name: 'Performance', href: '/performance', icon: BarChart3, roles: ['SUPER_ADMIN', 'ADMIN', 'DEPT_MANAGER', 'EMPLOYEE'] },
-  { name: 'Projects', href: '/projects', icon: Briefcase, roles: ['SUPER_ADMIN', 'ADMIN', 'DEPT_MANAGER', 'EMPLOYEE'] },
-  { name: 'Training', href: '/training', icon: GraduationCap, roles: ['SUPER_ADMIN', 'ADMIN', 'DEPT_MANAGER', 'EMPLOYEE'] },
-  { name: 'Recruitment', href: '/recruitment', icon: UserPlus, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
+  { name: 'Employees', href: '/employees', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
+  { name: 'Attendance', href: '/attendance', icon: CalendarCheck, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
+  { name: 'Leaves', href: '/leaves', icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
+  { name: 'Payroll', href: '/payroll', icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'HR'] },
+  { name: 'Performance', href: '/performance', icon: BarChart3, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
+  { name: 'Projects', href: '/projects', icon: Briefcase, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
+  { name: 'Training', href: '/training', icon: GraduationCap, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
+  { name: 'Recruitment', href: '/recruitment', icon: UserPlus, roles: ['SUPER_ADMIN', 'ADMIN', 'HR'] },
 ];
 
 export function Sidebar() {

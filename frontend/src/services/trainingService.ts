@@ -3,10 +3,9 @@ import api from '@/lib/api';
 export interface TrainingData {
   training_name: string;
   trainer_name: string;
-  start_date: string;
-  end_date: string;
+  training_date: string;
+  duration: string;
   description: string;
-  location: string;
 }
 
 export interface EnrollmentData {

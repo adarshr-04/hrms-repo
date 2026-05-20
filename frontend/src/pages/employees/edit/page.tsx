@@ -60,7 +60,7 @@ export default function EditEmployee() {
       const data = currentEmp;
       Object.keys(data).forEach(key => {
         if (key === 'avatar' && (data as any)[key]) {
-          const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
+          const baseUrl = (import.meta as any).env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
           setAvatarPreview(`${baseUrl}${(data as any)[key]}`);
         } else {
           setValue(key as any, (data as any)[key]);

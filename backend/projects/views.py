@@ -1,12 +1,48 @@
 from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated, BasePermission
 from .models import Project, ProjectAssignment, TaskLog
 from .serializers import ProjectSerializer, ProjectAssignmentSerializer, TaskLogSerializer
+from accounts.utils import get_user_role
+from employees.models import Employee
+
+class IsHROrAdmin(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user or request.user.is_anonymous:
+            return False
+        return get_user_role(request.user) in ['SUPER_ADMIN', 'ADMIN', 'HR']
 
 class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
+    pagination_class = None
     filterset_fields = ['status']
     search_fields = ['project_name']
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsHROrAdmin()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or user.is_anonymous:
+            return Project.objects.none()
+
+        role = get_user_role(user)
+
+        if role in ['SUPER_ADMIN', 'ADMIN', 'HR']:
+            return Project.objects.all()
+
+        try:
+            emp = user.employee_profile
+            if role == 'DEPT_MANAGER':
+                subordinate_ids = list(Employee.objects.filter(manager=emp).values_list('id', flat=True))
+                subordinate_ids.append(emp.id)
+                return Project.objects.filter(assignments__employee_id__in=subordinate_ids).distinct()
+            else:
+                return Project.objects.filter(assignments__employee=emp).distinct()
+        except Exception:
+            return Project.objects.none()
 
 class ProjectAssignmentViewSet(viewsets.ModelViewSet):
     queryset = ProjectAssignment.objects.all()
@@ -14,8 +50,35 @@ class ProjectAssignmentViewSet(viewsets.ModelViewSet):
     filterset_fields = ['employee', 'project', 'role']
     search_fields = ['employee__first_name', 'employee__last_name', 'role']
 
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsHROrAdmin()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or user.is_anonymous:
+            return ProjectAssignment.objects.none()
+
+        role = get_user_role(user)
+
+        if role in ['SUPER_ADMIN', 'ADMIN', 'HR']:
+            return ProjectAssignment.objects.all()
+
+        try:
+            emp = user.employee_profile
+            if role == 'DEPT_MANAGER':
+                subordinate_ids = list(Employee.objects.filter(manager=emp).values_list('id', flat=True))
+                subordinate_ids.append(emp.id)
+                return ProjectAssignment.objects.filter(employee_id__in=subordinate_ids)
+            else:
+                return ProjectAssignment.objects.filter(employee=emp)
+        except Exception:
+            return ProjectAssignment.objects.none()
+
 class TaskLogViewSet(viewsets.ModelViewSet):
     queryset = TaskLog.objects.all()
     serializer_class = TaskLogSerializer
     filterset_fields = ['date', 'owner', 'status']
     search_fields = ['task_description', 'owner', 'remarks']
+

@@ -5,16 +5,17 @@ import {
   CheckCircle2, 
   XCircle, 
   Clock, 
-  Search,
-  Filter,
-  ArrowRight,
-  Loader2,
-  AlertCircle
+  Search, 
+  Filter, 
+  ArrowRight, 
+  Loader2, 
+  AlertCircle 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { leaveService } from '@/services/leaveService';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
+import { toast } from 'sonner';
 
 export default function LeavesPage() {
   const { user, isAdmin, isManager } = useAuth();
@@ -22,14 +23,33 @@ export default function LeavesPage() {
   const [leaves, setLeaves] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('PENDING');
 
+  // Request Leave Modal States
+  const [showModal, setShowModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    leave_type: 'CASUAL',
+    start_date: '',
+    end_date: '',
+    reason: ''
+  });
+
+  const calculateDays = (start: string, end: string) => {
+    if (!start || !end) return 0;
+    const s = new Date(start);
+    const e = new Date(end);
+    const diff = e.getTime() - s.getTime();
+    if (diff < 0) return 0;
+    return Math.floor(diff / (1000 * 60 * 60 * 24)) + 1;
+  };
+
   const fetchLeaves = async () => {
     setLoading(true);
     try {
       const params: any = { status: activeTab === 'ALL' ? undefined : activeTab };
       
       // If not admin/manager, only fetch current user's leaves
-      if (!isAdmin && !isManager && user?.employee_id) {
-        params.employee = user.employee_id;
+      if (!isAdmin && !isManager && user?.employee_profile_id) {
+        params.employee = user.employee_profile_id;
       }
       
       const data = await leaveService.getAll(params);
@@ -40,6 +60,48 @@ export default function LeavesPage() {
       setLoading(false);
     }
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.employee_profile_id) {
+      toast.error("Employee profile not found.");
+      return;
+    }
+    const days = calculateDays(formData.start_date, formData.end_date);
+    if (days <= 0) {
+      toast.error("End date must be on or after start date.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await leaveService.create({
+        employee: user.employee_profile_id,
+        leave_type: formData.leave_type,
+        start_date: formData.start_date,
+        end_date: formData.end_date,
+        total_days: days,
+        reason: formData.reason,
+        status: 'PENDING'
+      });
+      toast.success("Leave request submitted successfully!");
+      setShowModal(false);
+      setFormData({
+        leave_type: 'CASUAL',
+        start_date: '',
+        end_date: '',
+        reason: ''
+      });
+      void fetchLeaves();
+    } catch (error: any) {
+      console.error("Failed to request leave", error);
+      const errMsg = error.response?.data?.detail || error.response?.data?.non_field_errors?.[0] || "Failed to submit request.";
+      toast.error(errMsg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
 
   useEffect(() => {
     fetchLeaves();
@@ -65,12 +127,14 @@ export default function LeavesPage() {
             {isAdmin || isManager ? 'Approve or manage employee time-off requests.' : 'Track and manage your time-off applications.'}
           </p>
         </div>
-        {!isAdmin && !isManager && (
-          <button className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all shadow-sm">
-            <FileText className="w-4 h-4" />
-            <span>Request Leave</span>
-          </button>
-        )}
+        <button 
+          onClick={() => setShowModal(true)}
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all shadow-sm"
+        >
+          <FileText className="w-4 h-4" />
+          <span>Request Leave</span>
+        </button>
+
       </div>
 
       {/* Tabs */}
@@ -173,6 +237,106 @@ export default function LeavesPage() {
           ))
         )}
       </div>
+
+      {/* Leave Request Form Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900">Request Leave</h3>
+              <button 
+                onClick={() => setShowModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Leave Type</label>
+                <select 
+                  value={formData.leave_type}
+                  onChange={(e) => setFormData({ ...formData, leave_type: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-600 bg-white"
+                  required
+                >
+                  <option value="SICK">Sick Leave</option>
+                  <option value="CASUAL">Casual Leave</option>
+                  <option value="ANNUAL">Annual Leave</option>
+                  <option value="MATERNITY">Maternity Leave</option>
+                  <option value="PATERNITY">Paternity Leave</option>
+                  <option value="UNPAID">Unpaid Leave</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Start Date</label>
+                  <input 
+                    type="date"
+                    value={formData.start_date}
+                    onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-600"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">End Date</label>
+                  <input 
+                    type="date"
+                    value={formData.end_date}
+                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-600"
+                    required
+                  />
+                </div>
+              </div>
+
+              {formData.start_date && formData.end_date && (
+                <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-xs text-indigo-700 font-medium">
+                  Total duration: {calculateDays(formData.start_date, formData.end_date)} day(s)
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Reason</label>
+                <textarea 
+                  value={formData.reason}
+                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                  placeholder="Explain the reason for your time-off request..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-600 h-24 resize-none"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button 
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-lg text-sm font-bold text-slate-600 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={submitting}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg text-sm font-bold transition-all shadow-sm shadow-indigo-100"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Submitting...</span>
+                    </>
+                  ) : (
+                    <span>Submit Request</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

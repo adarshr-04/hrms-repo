@@ -15,8 +15,10 @@ import {
 import { cn } from '@/lib/utils';
 import { projectService } from '@/services/projectService';
 import { format } from 'date-fns';
+import { useAuth } from '@/context/AuthContext';
 
 export default function ProjectsPage() {
+  const { isHR } = useAuth();
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<any[]>([]);
 
@@ -52,10 +54,12 @@ export default function ProjectsPage() {
           <h1 className="text-2xl font-bold text-slate-900">Project Management</h1>
           <p className="text-slate-500">Track initiatives and team allocations across the organization.</p>
         </div>
-        <button className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all shadow-sm">
-          <Plus className="w-4 h-4" />
-          <span>Launch Project</span>
-        </button>
+        {isHR && (
+          <button className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all shadow-sm">
+            <Plus className="w-4 h-4" />
+            <span>Launch Project</span>
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

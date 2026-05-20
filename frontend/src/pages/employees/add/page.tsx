@@ -63,9 +63,22 @@ const VALIDATION_RULES = {
   },
   dob: {
     validate: (value: string) => {
+      if (!value) return true; // Optional field
       const date = new Date(value);
       const now = new Date();
       return date < now || "Date of birth cannot be in the future";
+    }
+  },
+  optionalEmail: {
+    validate: (value?: string) => {
+      if (!value) return true; // Optional field
+      return /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value) || "Invalid email address format";
+    }
+  },
+  optionalPhone: {
+    validate: (value?: string) => {
+      if (!value) return true; // Optional field
+      return /^[0-9+() -]{10,15}$/.test(value) || "Please enter a valid phone number (10-15 digits)";
     }
   }
 };
@@ -243,10 +256,10 @@ export default function AddEmployeePage() {
                     <FormInput label="Date of Birth" type="date" error={errors.date_of_birth} registration={register("date_of_birth", VALIDATION_RULES.dob)} />
                     
                     <FormInput label="Primary Email" required type="email" placeholder="rounak@company.com" error={errors.email} registration={register("email", VALIDATION_RULES.email)} />
-                    <FormInput label="Alternative Email" type="email" placeholder="rounak.alt@gmail.com" error={errors.alternative_email} registration={register("alternative_email", { pattern: VALIDATION_RULES.email.pattern })} />
+                    <FormInput label="Alternative Email" type="email" placeholder="rounak.alt@gmail.com" error={errors.alternative_email} registration={register("alternative_email", VALIDATION_RULES.optionalEmail)} />
                     
                     <FormInput label="Primary Mobile" required placeholder="9876543210" error={errors.phone_number} registration={register("phone_number", VALIDATION_RULES.phone)} />
-                    <FormInput label="Alternative Mobile" placeholder="9876543211" error={errors.alternative_phone_number} registration={register("alternative_phone_number", { pattern: VALIDATION_RULES.phone.pattern })} />
+                    <FormInput label="Alternative Mobile" placeholder="9876543211" error={errors.alternative_phone_number} registration={register("alternative_phone_number", VALIDATION_RULES.optionalPhone)} />
                   </div>
                 </div>
 

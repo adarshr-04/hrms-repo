@@ -6,21 +6,21 @@ type RouteRule = {
 };
 
 const routeRules: RouteRule[] = [
-  { prefix: "/", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN"] },
-  { prefix: "/login", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN"] },
+  { prefix: "/", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN", "HR"] },
+  { prefix: "/login", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN", "HR"] },
 
-  { prefix: "/employees", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN"] },
-  { prefix: "/employees/add", roles: ["ADMIN", "SUPER_ADMIN"] },
-  { prefix: "/employees/edit", roles: ["ADMIN", "SUPER_ADMIN"] },
+  { prefix: "/employees", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN", "HR"] },
+  { prefix: "/employees/add", roles: ["ADMIN", "SUPER_ADMIN", "HR"] },
+  { prefix: "/employees/edit", roles: ["ADMIN", "SUPER_ADMIN", "HR"] },
 
-  { prefix: "/attendance", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN"] },
-  { prefix: "/leaves", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN"] },
-  { prefix: "/performance", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN"] },
-  { prefix: "/projects", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN"] },
-  { prefix: "/training", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN"] },
+  { prefix: "/attendance", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN", "HR"] },
+  { prefix: "/leaves", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN", "HR"] },
+  { prefix: "/performance", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN", "HR"] },
+  { prefix: "/projects", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN", "HR"] },
+  { prefix: "/training", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN", "HR"] },
 
-  { prefix: "/payroll", roles: ["ADMIN", "SUPER_ADMIN"] },
-  { prefix: "/recruitment", roles: ["ADMIN", "SUPER_ADMIN"] },
+  { prefix: "/payroll", roles: ["ADMIN", "SUPER_ADMIN", "HR"] },
+  { prefix: "/recruitment", roles: ["ADMIN", "SUPER_ADMIN", "HR"] },
 ];
 
 export function isRouteAllowed(pathname: string, role: UserRole): boolean {

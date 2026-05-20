@@ -14,6 +14,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   refreshUser: () => Promise<void>;
   isAdmin: boolean;
+  isHR: boolean;
   isManager: boolean;
   isEmployee: boolean;
 }
@@ -80,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+  const isHR = user?.role === 'HR' || isAdmin;
   const isManager = user?.role === 'DEPT_MANAGER' || isAdmin;
   const isEmployee = user?.role === 'EMPLOYEE';
 
@@ -92,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: !!user,
       refreshUser: fetchUserProfile,
       isAdmin,
+      isHR,
       isManager,
       isEmployee
     }}>

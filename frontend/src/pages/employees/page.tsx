@@ -28,7 +28,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Employee, Department } from '@/types';
 
 export default function EmployeesPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isHR } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +77,7 @@ export default function EmployeesPage() {
   const getAvatarUrl = (path: string) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
-    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
+    const baseUrl = (import.meta as any).env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
     return `${baseUrl}${path}`;
   };
 
@@ -107,7 +107,7 @@ export default function EmployeesPage() {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Workforce Directory</h1>
           <p className="text-sm font-medium text-slate-500 mt-1">Discover and connect with your organization&apos;s talent.</p>
         </div>
-        {isAdmin && (
+        {(isAdmin || isHR) && (
           <Link to="/employees/add"
             className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-200 group"
           >
@@ -181,7 +181,7 @@ export default function EmployeesPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
           {filteredEmployees.map((emp) => (
-            <EmployeeCard key={emp.id} emp={emp} getAvatarUrl={getAvatarUrl} isAdmin={isAdmin} />
+            <EmployeeCard key={emp.id} emp={emp} getAvatarUrl={getAvatarUrl} isAdmin={isAdmin || isHR} />
           ))}
         </div>
       )}

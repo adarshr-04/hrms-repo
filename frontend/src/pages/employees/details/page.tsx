@@ -60,7 +60,7 @@ export default function EmployeeProfilePage() {
   const getAvatarUrl = (path: string) => {
     if (!path) return undefined;
     if (path.startsWith('http')) return path;
-    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
+    const baseUrl = (import.meta as any).env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
     return `${baseUrl}${path}`;
   };
 

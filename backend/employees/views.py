@@ -2,26 +2,37 @@ from datetime import date
 
 from rest_framework import viewsets, parsers, status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, BasePermission, SAFE_METHODS
 from rest_framework.response import Response
 
 import pandas as pd
 
 from .models import Department, Employee
 from .serializers import DepartmentSerializer, EmployeeSerializer
+from accounts.utils import get_user_role
+
+
+class IsHROrAdminOrReadOnly(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user or request.user.is_anonymous:
+            return False
+        if request.method in SAFE_METHODS:
+            return True
+        return get_user_role(request.user) in ['SUPER_ADMIN', 'ADMIN', 'HR']
 
 
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsHROrAdminOrReadOnly]
     pagination_class = None
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.all()
     serializer_class = EmployeeSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsHROrAdminOrReadOnly]
+    pagination_class = None
     parser_classes = (parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser)
     filterset_fields = ['department', 'status', 'employment_type']
     search_fields = ['first_name', 'last_name', 'employee_id', 'email']

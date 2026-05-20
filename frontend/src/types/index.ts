@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'DEPT_MANAGER' | 'EMPLOYEE' | 'SUPER_ADMIN';
+export type UserRole = 'ADMIN' | 'HR' | 'DEPT_MANAGER' | 'EMPLOYEE' | 'SUPER_ADMIN';
 
 export interface User {
   id: number;
@@ -9,6 +9,7 @@ export interface User {
   role: UserRole;
   department?: string;
   employee_id?: string;
+  employee_profile_id?: number;
 }
 
 export interface Employee {

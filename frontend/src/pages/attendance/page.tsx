@@ -9,18 +9,77 @@ import {
   Search,
   Filter,
   Plus,
-  Loader2
+  Loader2,
+  Fingerprint,
+  CheckCircle2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { attendanceService } from '@/services/attendanceService';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
+import { toast } from 'sonner';
 
 export default function AttendancePage() {
   const { user, isAdmin, isManager } = useAuth();
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  // Interactive Daily Tap Terminal States
+  const [tapStatus, setTapStatus] = useState<'OFFLINE' | 'TAPPED_IN' | 'TAPPED_OUT'>('OFFLINE');
+  const [tapRecord, setTapRecord] = useState<any>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [isTapping, setIsTapping] = useState(false);
+
+  // Live ticking clock
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Running stopwatch duration calculator (HH:MM:SS)
+  const getRunningDuration = () => {
+    if (!tapRecord || !tapRecord.check_in) return "00:00:00";
+    try {
+      const [inH, inM, inS] = tapRecord.check_in.split(':').map(Number);
+      const checkInDate = new Date(currentTime);
+      checkInDate.setHours(inH, inM, inS || 0);
+      
+      const diffMs = currentTime.getTime() - checkInDate.getTime();
+      if (diffMs < 0) return "00:00:00";
+      
+      const hrs = Math.floor(diffMs / 3600000);
+      const mins = Math.floor((diffMs % 3600000) / 60000);
+      const secs = Math.floor((diffMs % 60000) / 1000);
+      
+      const pad = (num: number) => String(num).padStart(2, '0');
+      return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+    } catch (err) {
+      return "00:00:00";
+    }
+  };
+
+  const checkTodayTapStatus = async () => {
+    const empId = user?.employee_profile_id || 1; // Fallback to employee PK 1 for demo admins
+    if (!empId) return;
+    try {
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      const logs = await attendanceService.getAll({ employee: empId, attendance_date: todayStr });
+      const todayRecord = Array.isArray(logs) ? logs[0] : (logs.results ? logs.results[0] : null);
+      if (todayRecord) {
+        setTapRecord(todayRecord);
+        if (todayRecord.check_in && !todayRecord.check_out) {
+          setTapStatus('TAPPED_IN');
+        } else if (todayRecord.check_in && todayRecord.check_out) {
+          setTapStatus('TAPPED_OUT');
+        }
+      } else {
+        setTapStatus('OFFLINE');
+      }
+    } catch (err) {
+      console.error("Failed to fetch today's tap status", err);
+    }
+  };
 
   const fetchAttendance = async () => {
     setLoading(true);
@@ -29,8 +88,8 @@ export default function AttendancePage() {
       const params: Record<string, string | number> = { attendance_date: dateStr };
       
       // If not admin/manager, only fetch current user's attendance
-      if (!isAdmin && !isManager && user?.employee_id) {
-        params.employee = user.employee_id;
+      if (!isAdmin && !isManager && user?.employee_profile_id) {
+        params.employee = user.employee_profile_id;
       }
       
       const data = await attendanceService.getAll(params);
@@ -44,7 +103,96 @@ export default function AttendancePage() {
 
   useEffect(() => {
     void fetchAttendance();
-  }, [selectedDate, isAdmin, isManager, user?.employee_id]);
+  }, [selectedDate, isAdmin, isManager, user?.employee_profile_id]);
+
+
+  useEffect(() => {
+    void checkTodayTapStatus();
+  }, [user?.employee_profile_id]);
+
+  const handleTap = async () => {
+    setIsTapping(true);
+    const empId = user?.employee_profile_id || 1; // Fallback to employee PK 1 for demo admins
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const timeStr = currentTime.toLocaleTimeString('en-US', { hour12: false });
+
+    try {
+      if (tapStatus === 'OFFLINE') {
+        // Tap In (first time of day)
+        const checkInHour = currentTime.getHours();
+        const checkInMinute = currentTime.getMinutes();
+        const isLate = checkInHour > 9 || (checkInHour === 9 && checkInMinute > 30);
+        const status = isLate ? 'LATE' : 'PRESENT';
+
+        const record = await attendanceService.logAttendance({
+          employee: empId,
+          attendance_date: todayStr,
+          check_in: timeStr,
+          status: status,
+          notes: `Tapped In via Attendance Terminal at ${currentTime.toLocaleTimeString()}`
+        });
+
+        setTapRecord(record);
+        setTapStatus('TAPPED_IN');
+        toast.success("Successfully Tapped In! Shift started.");
+      } else if (tapStatus === 'TAPPED_OUT') {
+        // Resuming Shift / Tap In Again
+        if (!tapRecord || !tapRecord.id) {
+          toast.error("Tap record is missing. Synchronizing status...");
+          await checkTodayTapStatus();
+          setIsTapping(false);
+          return;
+        }
+
+        const record = await attendanceService.updateAttendance(tapRecord.id, {
+          check_in: timeStr,
+          check_out: null as any,
+          notes: `${tapRecord.notes || ''}\nResumed Shift (Tapped In) at ${currentTime.toLocaleTimeString()}`
+        });
+
+        setTapRecord(record);
+        setTapStatus('TAPPED_IN');
+        toast.success("Successfully Tapped In again! Shift resumed.");
+      } else if (tapStatus === 'TAPPED_IN') {
+        // Tap Out (pauses or ends session)
+        if (!tapRecord || !tapRecord.id) {
+          toast.error("Tap record is missing. Synchronizing status...");
+          await checkTodayTapStatus();
+          setIsTapping(false);
+          return;
+        }
+
+        // Calculate hours worked in this session (precision seconds to match stopwatch)
+        const checkInTime = tapRecord.check_in || "09:30:00";
+        const [inH, inM, inS] = checkInTime.split(':').map(Number);
+        const outH = currentTime.getHours();
+        const outM = currentTime.getMinutes();
+        const outS = currentTime.getSeconds();
+        const diffMs = (outH * 3600 + outM * 60 + outS) - (inH * 3600 + inM * 60 + (inS || 0));
+        const hoursThisSession = Math.max(0.0001, Number((diffMs / 3600).toFixed(4)));
+
+        // Accumulate work hours
+        const totalHours = Number(tapRecord.work_hours || 0) + hoursThisSession;
+
+        const record = await attendanceService.updateAttendance(tapRecord.id, {
+          check_out: timeStr,
+          work_hours: totalHours,
+          notes: `${tapRecord.notes || ''}\nTapped Out via Attendance Terminal at ${currentTime.toLocaleTimeString()}. Logged ${hoursThisSession.toFixed(2)}h for this session. (Total accumulated: ${totalHours.toFixed(2)}h)`
+        });
+
+        setTapRecord(record);
+        setTapStatus('TAPPED_OUT');
+        toast.success(`Successfully Tapped Out! Shift paused. Total: ${totalHours.toFixed(2)}h`);
+      }
+      // Instantly refresh list of records on page
+      await fetchAttendance();
+    } catch (error) {
+      console.error("Failed to complete tap transaction", error);
+      toast.error("Tap transaction failed. Please try again.");
+    } finally {
+      setIsTapping(false);
+    }
+  };
 
   const getStatusColor = (status: any) => {
     switch (status) {
@@ -86,8 +234,63 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Summary & Tap Card Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        
+        {/* Daily Shift Terminal Card */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between relative overflow-hidden group min-h-[120px]">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Fingerprint className="w-4 h-4 text-indigo-600" />
+                Shift Tracker
+              </p>
+              <h3 className="text-sm font-bold text-slate-800 mt-2 font-mono">
+                {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </h3>
+            </div>
+            {(tapStatus === 'OFFLINE' || tapStatus === 'TAPPED_OUT') && (
+              <button
+                disabled={isTapping}
+                onClick={handleTap}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-black transition-all shadow-sm active:scale-95 animate-pulse"
+              >
+                {isTapping ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Tap In'}
+              </button>
+            )}
+            {tapStatus === 'TAPPED_IN' && (
+              <button
+                disabled={isTapping}
+                onClick={handleTap}
+                className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-xs font-black transition-all shadow-sm active:scale-95"
+              >
+                {isTapping ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Tap Out'}
+              </button>
+            )}
+          </div>
+          <div className="mt-2.5 border-t border-slate-100 pt-2 text-[10px] font-medium text-slate-400 flex flex-col gap-1">
+            {tapStatus === 'OFFLINE' && 'Not checked in today.'}
+            {tapStatus === 'TAPPED_IN' && (
+              <>
+                <span>Active session started at <strong className="text-slate-700">{tapRecord?.check_in || '--:--'}</strong></span>
+                {Number(tapRecord?.work_hours || 0) > 0 && (
+                  <span>Accumulated time: <strong className="text-slate-700">{Number(tapRecord.work_hours).toFixed(2)}h</strong></span>
+                )}
+                <span className="text-indigo-600 font-bold font-mono flex items-center gap-1 mt-0.5">
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
+                  Active Session: {getRunningDuration()}
+                </span>
+              </>
+            )}
+            {tapStatus === 'TAPPED_OUT' && (
+              <>
+                <span>Currently Tapped Out.</span>
+                <span className="font-semibold text-emerald-600">Total Work Hours Logged: {Number(tapRecord?.work_hours || 0).toFixed(2)}h</span>
+              </>
+            )}
+          </div>
+        </div>
+
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center">
             <UserCheck className="w-6 h-6" />
@@ -97,6 +300,7 @@ export default function AttendancePage() {
             <h3 className="text-xl font-bold text-slate-900">{records.filter(r => r.status === 'PRESENT').length}</h3>
           </div>
         </div>
+
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center">
             <Clock className="w-6 h-6" />
@@ -106,6 +310,7 @@ export default function AttendancePage() {
             <h3 className="text-xl font-bold text-slate-900">{records.filter(r => r.status === 'LATE').length}</h3>
           </div>
         </div>
+
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 bg-red-50 text-red-600 rounded-lg flex items-center justify-center">
             <UserX className="w-6 h-6" />
@@ -115,6 +320,7 @@ export default function AttendancePage() {
             <h3 className="text-xl font-bold text-slate-900">{records.filter(r => r.status === 'ABSENT').length}</h3>
           </div>
         </div>
+
       </div>
 
       {/* Attendance Table */}

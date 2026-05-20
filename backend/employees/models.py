@@ -103,7 +103,7 @@ class Employee(BaseModel):
                 # Ensure uniqueness — increment until a free slot is found
                 while Employee.objects.filter(employee_id=candidate).exists():
                     next_id += 1
-                    candidate = f'EMP-{next_id:04d}'
+                    candidate = f'PITS-{next_id:04d}'
 
                 self.employee_id = candidate
 

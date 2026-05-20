@@ -15,6 +15,8 @@ import PerformancePage from './pages/performance/page';
 import ProjectsPage from './pages/projects/page';
 import TrackerPage from './pages/tracker/page';
 import TrainingPage from './pages/training/page';
+import PayrollPage from './pages/payroll/page';
+import RecruitmentPage from './pages/recruitment/page';
 
 export default function App() {
   return (
@@ -34,6 +36,8 @@ export default function App() {
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/tracker" element={<TrackerPage />} />
             <Route path="/training" element={<TrainingPage />} />
+            <Route path="/payroll" element={<PayrollPage />} />
+            <Route path="/recruitment" element={<RecruitmentPage />} />
           </Routes>
         </AuthGuard>
       </AuthProvider>
