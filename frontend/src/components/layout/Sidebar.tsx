@@ -28,6 +28,7 @@ const navItems = [
   { name: 'Projects', href: '/projects', icon: Briefcase, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
   { name: 'Training', href: '/training', icon: GraduationCap, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
   { name: 'Recruitment', href: '/recruitment', icon: UserPlus, roles: ['SUPER_ADMIN', 'ADMIN', 'HR'] },
+  { name: 'Settings', href: '/settings', icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
 ];
 
 export function Sidebar() {
@@ -46,7 +47,7 @@ export function Sidebar() {
         <span className="text-xl font-bold text-white tracking-tight">HRMS Enterprise</span>
       </div>
 
-      <nav className="flex-1 px-4 space-y-1">
+      <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
         {filteredNavItems.map((item) => {
           const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
           return (
@@ -83,10 +84,6 @@ export function Sidebar() {
         >
           <LogOut className="w-5 h-5" />
           <span>Logout</span>
-        </button>
-        <button className="flex items-center gap-3 px-3 py-2 w-full text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all mt-1">
-          <Settings className="w-5 h-5" />
-          <span>Settings</span>
         </button>
       </div>
     </div>

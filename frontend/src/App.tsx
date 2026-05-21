@@ -17,6 +17,8 @@ import TrackerPage from './pages/tracker/page';
 import TrainingPage from './pages/training/page';
 import PayrollPage from './pages/payroll/page';
 import RecruitmentPage from './pages/recruitment/page';
+import SettingsPage from './pages/settings/page';
+import NotificationsPage from './pages/notifications/page';
 
 export default function App() {
   return (
@@ -38,6 +40,8 @@ export default function App() {
             <Route path="/training" element={<TrainingPage />} />
             <Route path="/payroll" element={<PayrollPage />} />
             <Route path="/recruitment" element={<RecruitmentPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
           </Routes>
         </AuthGuard>
       </AuthProvider>
