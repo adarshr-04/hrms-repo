@@ -30,6 +30,7 @@ export default function PayrollPage() {
 
   // Modal States
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -45,6 +46,12 @@ export default function PayrollPage() {
     tax: '0',
     bonus: '0',
     payment_mode: 'BANK_TRANSFER',
+    pay_date: new Date().toISOString().split('T')[0]
+  });
+
+  const [bulkFormData, setBulkFormData] = useState({
+    pay_period_start: '',
+    pay_period_end: '',
     pay_date: new Date().toISOString().split('T')[0]
   });
 
@@ -75,6 +82,71 @@ export default function PayrollPage() {
     } catch (error) {
       console.error("Failed to fetch employees", error);
     }
+  };
+
+  const handleBulkGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const res = await payrollService.bulkGenerate(bulkFormData);
+      toast.success(res.message || "Bulk payroll processing complete!");
+      setShowBulkModal(false);
+      fetchPayroll();
+    } catch (error: any) {
+      console.error("Failed to run bulk payroll", error);
+      const errMsg = error.response?.data?.detail || error.response?.data?.error || "Failed to process bulk payroll.";
+      toast.error(errMsg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (payrollData.length === 0) {
+      toast.error("No payroll data to export.");
+      return;
+    }
+    const headers = [
+      "Employee",
+      "Period Start",
+      "Period End",
+      "Basic Salary",
+      "Allowances",
+      "Bonus",
+      "Deductions",
+      "Tax",
+      "Net Pay",
+      "Pay Date",
+      "Payment Mode",
+      "Status"
+    ];
+    
+    const rows = payrollData.map(r => [
+      `"${r.employee_name}"`,
+      r.pay_period_start,
+      r.pay_period_end,
+      r.basic_salary,
+      r.allowances,
+      r.bonus,
+      r.deductions,
+      r.tax,
+      r.net_pay,
+      r.pay_date,
+      r.payment_mode,
+      r.status
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `payroll_report_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("CSV file downloaded successfully!");
   };
 
 
@@ -183,16 +255,26 @@ export default function PayrollPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:hidden">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Payroll Command Center</h1>
           <p className="text-sm font-medium text-slate-500">Real-time tracking of employee salaries and disbursements.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="flex items-center justify-center gap-2 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 rounded-lg font-medium transition-all shadow-sm">
+          <button 
+            onClick={handleExportCSV}
+            className="flex items-center justify-center gap-2 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 rounded-lg font-medium transition-all shadow-sm"
+          >
             <Download className="w-4 h-4" />
             <span>Export CSV</span>
+          </button>
+          <button 
+            onClick={() => setShowBulkModal(true)}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-all shadow-sm shadow-emerald-200"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Bulk Run Payroll</span>
           </button>
           <button 
             onClick={() => setShowGenerateModal(true)}
@@ -525,6 +607,90 @@ export default function PayrollPage() {
         </div>
       )}
 
+      {/* Bulk Generate Payroll Modal */}
+      {showBulkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Bulk Run Payroll</h3>
+                <p className="text-xs text-slate-500">Auto-generate records for all active employees.</p>
+              </div>
+              <button 
+                onClick={() => setShowBulkModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <form onSubmit={handleBulkGenerate} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Period Start</label>
+                  <input 
+                    type="date"
+                    value={bulkFormData.pay_period_start}
+                    onChange={(e) => setBulkFormData({ ...bulkFormData, pay_period_start: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-600"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Period End</label>
+                  <input 
+                    type="date"
+                    value={bulkFormData.pay_period_end}
+                    onChange={(e) => setBulkFormData({ ...bulkFormData, pay_period_end: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-600"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Payment Date</label>
+                <input 
+                  type="date"
+                  value={bulkFormData.pay_date}
+                  onChange={(e) => setBulkFormData({ ...bulkFormData, pay_date: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-600"
+                  required
+                />
+              </div>
+
+              <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-xs text-amber-800 font-medium">
+                Note: This will auto-generate payroll records for all employees currently marked as <strong>ACTIVE</strong>. If an employee has previous payroll records, their basic salary structure will be cloned. Otherwise, a baseline structure will be used.
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button 
+                  type="button"
+                  onClick={() => setShowBulkModal(false)}
+                  className="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-lg text-sm font-bold text-slate-600 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={submitting}
+                  className="flex items-center justify-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg text-sm font-bold transition-all shadow-sm shadow-indigo-100"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <span>Process Bulk Run</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Detailed Payslip View Modal */}
       {showDetailModal && selectedRecord && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
@@ -617,17 +783,180 @@ export default function PayrollPage() {
             </div>
 
             {/* Footer buttons */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-              <button 
-                onClick={() => setShowDetailModal(false)}
-                className="px-4 py-2 bg-slate-900 text-white font-bold rounded-lg text-xs hover:bg-slate-800 transition-all"
-              >
-                Close Receipt
-              </button>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <div className="flex gap-2">
+                {selectedRecord.status === 'PENDING' && (
+                  <button 
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await payrollService.updateStatus(selectedRecord.id, 'PAID');
+                        toast.success("Payroll marked as Paid!");
+                        setShowDetailModal(false);
+                        void fetchPayroll();
+                      } catch (err) {
+                        toast.error("Failed to update status.");
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-all shadow-sm"
+                  >
+                    Mark Paid
+                  </button>
+                )}
+                {selectedRecord.status !== 'VOID' && (
+                  <button 
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await payrollService.updateStatus(selectedRecord.id, 'VOID');
+                        toast.success("Payroll marked as Void.");
+                        setShowDetailModal(false);
+                        void fetchPayroll();
+                      } catch (err) {
+                        toast.error("Failed to update status.");
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs transition-all shadow-sm"
+                  >
+                    Void
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    window.print();
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition-all shadow-sm shadow-indigo-200"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Print
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setShowDetailModal(false)}
+                  className="px-4 py-2 border border-slate-200 hover:bg-slate-100 font-bold rounded-lg text-xs text-slate-700 transition-all"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Printable Receipt Layout (hidden on screen, only visible on print) */}
+      {selectedRecord && (
+        <div className="hidden print:block p-10 bg-white text-black font-sans w-full max-w-2xl mx-auto space-y-6">
+          <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
+            <div>
+              <h2 className="text-2xl font-black tracking-tight">HRMS ENTERPRISE</h2>
+              <p className="text-sm font-medium text-slate-600">Official Payslip Statement</p>
+            </div>
+            <div className="text-right">
+              <span className="inline-block px-3 py-1 bg-black text-white text-xs font-black uppercase tracking-wider rounded">
+                {selectedRecord.status}
+              </span>
+              <p className="text-xs text-slate-500 mt-2 font-mono">Receipt ID: PAY-{selectedRecord.id}-{selectedRecord.employee_id}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase">Employee Details</p>
+              <h4 className="font-extrabold text-base text-slate-900 mt-1">{selectedRecord.employee_name}</h4>
+              <p className="text-xs text-slate-600 mt-0.5">Staff ID: {selectedRecord.employee_id}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs font-bold text-slate-500 uppercase">Pay Period</p>
+              <p className="font-extrabold text-slate-900 mt-1">
+                {format(new Date(selectedRecord.pay_period_start), 'MMMM d')} - {format(new Date(selectedRecord.pay_period_end), 'MMMM d, yyyy')}
+              </p>
+              <p className="text-xs text-slate-600 mt-0.5">Payment Mode: {selectedRecord.payment_mode?.replace('_', ' ')}</p>
+            </div>
+          </div>
+
+          <div className="border border-slate-200 rounded-lg overflow-hidden mt-6">
+            <table className="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr className="bg-slate-100 border-b border-slate-200">
+                  <th className="px-4 py-2 font-bold">Item Description</th>
+                  <th className="px-4 py-2 font-bold text-right">Earnings</th>
+                  <th className="px-4 py-2 font-bold text-right">Deductions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                <tr>
+                  <td className="px-4 py-3 font-medium">Basic Salary</td>
+                  <td className="px-4 py-3 text-right font-mono font-semibold">{formatCurrency(selectedRecord.basic_salary)}</td>
+                  <td className="px-4 py-3 text-right font-mono">-</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 font-medium">Allowances</td>
+                  <td className="px-4 py-3 text-right font-mono font-semibold">+{formatCurrency(selectedRecord.allowances)}</td>
+                  <td className="px-4 py-3 text-right font-mono">-</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 font-medium">Bonus / Incentives</td>
+                  <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-700">+{formatCurrency(selectedRecord.bonus)}</td>
+                  <td className="px-4 py-3 text-right font-mono">-</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 font-medium">Provident Fund (PF)</td>
+                  <td className="px-4 py-3 text-right font-mono">-</td>
+                  <td className="px-4 py-3 text-right font-mono font-semibold text-rose-700">-{formatCurrency(selectedRecord.deductions)}</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 font-medium">Income Tax (TDS)</td>
+                  <td className="px-4 py-3 text-right font-mono">-</td>
+                  <td className="px-4 py-3 text-right font-mono font-semibold text-rose-700">-{formatCurrency(selectedRecord.tax)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-between items-center bg-slate-50 p-4 rounded-lg mt-4">
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase">Net Credited</p>
+              <p className="text-[10px] text-slate-400">Total amount transferred to bank account</p>
+            </div>
+            <div className="text-right">
+              <span className="text-2xl font-black font-mono text-indigo-700">{formatCurrency(selectedRecord.net_pay)}</span>
+            </div>
+          </div>
+
+          <div className="pt-6 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500">
+            <div>
+              <p>Generated on {format(new Date(), 'MMMM d, yyyy')}</p>
+              <p className="mt-0.5">Disbursement Date: {selectedRecord.pay_date ? format(new Date(selectedRecord.pay_date), 'MMM d, yyyy') : 'Pending'}</p>
+            </div>
+            <div className="text-right">
+              <div className="h-8 w-24 border-b border-slate-400 mx-auto"></div>
+              <p className="mt-1 font-bold">Authorized Signature</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Global CSS Styles for printing */}
+      <style>{`
+        @media print {
+          body {
+            background: white !important;
+            color: black !important;
+          }
+          .print\\:hidden {
+            display: none !important;
+          }
+          body > #root > * {
+            display: none !important;
+          }
+          .hidden.print\\:block {
+            display: block !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

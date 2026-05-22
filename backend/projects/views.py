@@ -1,4 +1,5 @@
 from rest_framework import viewsets
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from .models import Project, ProjectAssignment, TaskLog
 from .serializers import ProjectSerializer, ProjectAssignmentSerializer, TaskLogSerializer
@@ -10,6 +11,12 @@ class IsHROrAdmin(BasePermission):
         if not request.user or request.user.is_anonymous:
             return False
         return get_user_role(request.user) in ['SUPER_ADMIN', 'ADMIN', 'HR']
+
+class IsHROrAdminOrManager(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user or request.user.is_anonymous:
+            return False
+        return get_user_role(request.user) in ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER']
 
 class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all()
@@ -52,7 +59,7 @@ class ProjectAssignmentViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [IsHROrAdmin()]
+            return [IsHROrAdminOrManager()]
         return [IsAuthenticated()]
 
     def get_queryset(self):
@@ -75,6 +82,32 @@ class ProjectAssignmentViewSet(viewsets.ModelViewSet):
                 return ProjectAssignment.objects.filter(employee=emp)
         except Exception:
             return ProjectAssignment.objects.none()
+
+    def _ensure_manager_can_assign_employee(self, employee):
+        role = get_user_role(self.request.user)
+        if role in ['SUPER_ADMIN', 'ADMIN', 'HR']:
+            return
+
+        try:
+            manager = self.request.user.employee_profile
+        except Employee.DoesNotExist:
+            raise PermissionDenied('Only managers with an employee profile can assign projects.')
+
+        if employee.id != manager.id and employee.manager_id != manager.id:
+            raise PermissionDenied('Managers can only assign projects to themselves or their direct reports.')
+
+    def perform_create(self, serializer):
+        self._ensure_manager_can_assign_employee(serializer.validated_data['employee'])
+        serializer.save()
+
+    def perform_update(self, serializer):
+        employee = serializer.validated_data.get('employee', serializer.instance.employee)
+        self._ensure_manager_can_assign_employee(employee)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_manager_can_assign_employee(instance.employee)
+        instance.delete()
 
 class TaskLogViewSet(viewsets.ModelViewSet):
     queryset = TaskLog.objects.all()

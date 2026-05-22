@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Department, Employee
+from .models import Department, Employee, Document
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
@@ -94,3 +94,61 @@ class EmployeeSerializer(serializers.ModelSerializer):
                 f'Accepted values are: {readable}.'
             )
         return value
+
+    # -------------------------------------------------------------------------
+    # Auto-create / sync the Django User account when an employee is saved
+    # -------------------------------------------------------------------------
+
+    def create(self, validated_data):
+        from django.contrib.auth.models import User
+
+        email = validated_data.get('email', '')
+        first_name = validated_data.get('first_name', '')
+        last_name = validated_data.get('last_name', '') or ''
+
+        # Derive a clean username from the email (part before @)
+        base_username = email.split('@')[0].lower().replace(' ', '.') if email else first_name.lower()
+        username = base_username
+        counter = 1
+        while User.objects.filter(username=username).exists():
+            username = f"{base_username}{counter}"
+            counter += 1
+
+        # Create the Django user without a login password.
+        # Employee must use "Forgot Password" to set their own password.
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+        )
+        user.set_unusable_password()
+        user.save(update_fields=['password'])
+
+        # Link the user to the employee record
+        validated_data['user'] = user
+        employee = super().create(validated_data)
+        return employee
+
+    def update(self, instance, validated_data):
+        from django.contrib.auth.models import User
+
+        # Keep the linked user's email and name in sync
+        user = instance.user
+        if user:
+            if 'email' in validated_data:
+                user.email = validated_data['email']
+            if 'first_name' in validated_data:
+                user.first_name = validated_data['first_name']
+            if 'last_name' in validated_data:
+                user.last_name = validated_data['last_name'] or ''
+            user.save()
+
+        return super().update(instance, validated_data)
+
+
+class DocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Document
+        fields = '__all__'
+

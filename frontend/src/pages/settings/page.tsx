@@ -12,14 +12,17 @@ import {
   ShieldCheck, 
   Palette,
   Eye,
-  EyeOff
+  EyeOff,
+  Building
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import { profileService, ProfileData } from '@/services/profileService';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'preferences'>('profile');
+  const { isAdmin } = useAuth();
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'preferences' | 'company'>('profile');
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -57,6 +60,14 @@ export default function SettingsPage() {
     leaveApprovalNotifs: true,
   });
 
+  // Company Settings
+  const [company, setCompany] = useState({
+    name: 'HRMS Enterprise',
+    workingHours: '09:00 - 18:00',
+    timeZone: 'UTC',
+    leavePolicy: 'Standard 24 Days'
+  });
+
   const fetchProfile = async () => {
     setLoading(true);
     try {
@@ -92,7 +103,19 @@ export default function SettingsPage() {
     // Load local preferences
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
     if (savedTheme) setTheme(savedTheme);
-  }, []);
+    
+    // Load company settings if admin
+    if (isAdmin) {
+      const savedCompany = localStorage.getItem('companySettings');
+      if (savedCompany) {
+        try {
+          setCompany(JSON.parse(savedCompany));
+        } catch {
+          toast.error('Saved company settings could not be loaded.');
+        }
+      }
+    }
+  }, [isAdmin]);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -196,6 +219,13 @@ export default function SettingsPage() {
     toast.success('System preferences stored locally!');
   };
 
+  const handleSaveCompany = () => {
+    localStorage.setItem('companySettings', JSON.stringify(company));
+    // Dispatch a storage event so same-tab listeners (e.g. Sidebar) pick up the change immediately
+    window.dispatchEvent(new StorageEvent('storage', { key: 'companySettings' }));
+    toast.success('Company configuration updated!');
+  };
+
   if (loading) {
     return (
       <div className="h-[70vh] flex flex-col items-center justify-center text-slate-500 gap-4">
@@ -274,6 +304,20 @@ export default function SettingsPage() {
             <Palette className="w-4 h-4" />
             <span>Preferences</span>
           </button>
+          
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab('company')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all ${
+                activeTab === 'company'
+                  ? 'bg-indigo-50 text-indigo-600'
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+              }`}
+            >
+              <Building className="w-4 h-4" />
+              <span>Company Config</span>
+            </button>
+          )}
         </div>
 
         {/* Right Side Content Panel */}
@@ -647,6 +691,81 @@ export default function SettingsPage() {
                       className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-100"
                     >
                       Save Preferences
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          <AnimatePresence mode="wait">
+            {activeTab === 'company' && isAdmin && (
+              <motion.div
+                key="company"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                <div>
+                  <h2 className="text-lg font-black text-slate-900">Company Configuration</h2>
+                  <p className="text-xs font-semibold text-slate-400 mt-1">Manage global enterprise settings (Admin only).</p>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Enterprise Name</label>
+                      <input
+                        type="text"
+                        value={company.name}
+                        onChange={(e) => setCompany({...company, name: e.target.value})}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:bg-white transition-all font-semibold"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Working Hours</label>
+                      <input
+                        type="text"
+                        value={company.workingHours}
+                        onChange={(e) => setCompany({...company, workingHours: e.target.value})}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:bg-white transition-all font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Global Timezone</label>
+                      <select
+                        value={company.timeZone}
+                        onChange={(e) => setCompany({...company, timeZone: e.target.value})}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:bg-white transition-all font-semibold"
+                      >
+                        <option value="UTC">UTC</option>
+                        <option value="PST">PST</option>
+                        <option value="EST">EST</option>
+                        <option value="IST">IST</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Leave Policy Framework</label>
+                      <input
+                        type="text"
+                        value={company.leavePolicy}
+                        onChange={(e) => setCompany({...company, leavePolicy: e.target.value})}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:bg-white transition-all font-semibold"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end pt-4 border-t border-slate-100">
+                    <button
+                      onClick={handleSaveCompany}
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-100"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Apply Configuration</span>
                     </button>
                   </div>
                 </div>

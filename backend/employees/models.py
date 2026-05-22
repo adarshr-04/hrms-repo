@@ -98,7 +98,7 @@ class Employee(BaseModel):
                     .last()
                 )
                 next_id = (last_employee.id + 1) if last_employee else 1
-                candidate = f'EMP-{next_id:04d}'
+                candidate = f'PITS-{next_id:04d}'
 
                 # Ensure uniqueness — increment until a free slot is found
                 while Employee.objects.filter(employee_id=candidate).exists():
@@ -108,3 +108,12 @@ class Employee(BaseModel):
                 self.employee_id = candidate
 
         super().save(*args, **kwargs)
+
+
+class Document(BaseModel):
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='documents')
+    document_type = models.CharField(max_length=100)
+    file = models.FileField(upload_to='documents/')
+    
+    def __str__(self):
+        return f"{self.employee.employee_id} - {self.document_type}"

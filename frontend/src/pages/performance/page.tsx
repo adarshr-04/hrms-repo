@@ -89,13 +89,17 @@ export default function PerformancePage() {
       toast.error("Please write some feedback comment details.");
       return;
     }
+    if (!user?.employee_profile_id) {
+      toast.error("Reviewer profile not found.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       const todayStr = format(new Date(), 'yyyy-MM-dd');
       await performanceService.create({
         employee: Number(formData.employee),
-        reviewer: user?.employee_profile_id || 1,
+        reviewer: user.employee_profile_id,
         review_date: todayStr,
         rating: formData.rating,
         comments: formData.comments,

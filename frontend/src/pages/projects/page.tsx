@@ -10,17 +10,31 @@ import {
   Plus,
   Loader2,
   ChevronRight,
-  FolderDot
+  FolderDot,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { projectService } from '@/services/projectService';
+import { employeeService } from '@/services/employeeService';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
+import { Employee } from '@/types';
+import { toast } from 'sonner';
 
 export default function ProjectsPage() {
-  const { isHR } = useAuth();
+  const { user, isHR, isManager } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [savingAssignment, setSavingAssignment] = useState(false);
   const [projects, setProjects] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignmentForm, setAssignmentForm] = useState({
+    project: '',
+    employee: '',
+    role: '',
+    assigned_date: format(new Date(), 'yyyy-MM-dd'),
+  });
+  const canAssignProjects = isHR || isManager;
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
@@ -38,6 +52,63 @@ export default function ProjectsPage() {
     void fetchProjects();
   }, [fetchProjects]);
 
+  const fetchEmployees = useCallback(async () => {
+    if (!canAssignProjects) return;
+
+    try {
+      const data = await employeeService.getAll();
+      const list = Array.isArray(data) ? data : data.results;
+      const assignableEmployees = isManager && !isHR
+        ? list.filter((employee) => (
+            employee.id === user?.employee_profile_id ||
+            employee.manager === user?.employee_profile_id
+          ))
+        : list;
+
+      setEmployees(assignableEmployees.filter((employee) => employee.status === 'ACTIVE'));
+    } catch (error) {
+      console.error("Failed to fetch employees", error);
+    }
+  }, [canAssignProjects, isHR, isManager, user?.employee_profile_id]);
+
+  useEffect(() => {
+    void fetchEmployees();
+  }, [fetchEmployees]);
+
+  const openAssignModal = (projectId?: number | string) => {
+    setAssignmentForm({
+      project: projectId ? String(projectId) : '',
+      employee: '',
+      role: '',
+      assigned_date: format(new Date(), 'yyyy-MM-dd'),
+    });
+    setShowAssignModal(true);
+  };
+
+  const submitAssignment = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSavingAssignment(true);
+
+    try {
+      await projectService.createAssignment({
+        project: assignmentForm.project,
+        employee: assignmentForm.employee,
+        role: assignmentForm.role,
+        assigned_date: assignmentForm.assigned_date,
+      });
+      toast.success('Project assigned successfully');
+      setShowAssignModal(false);
+      await fetchProjects();
+    } catch (error: any) {
+      const message = error.response?.data?.detail
+        || error.response?.data?.non_field_errors?.[0]
+        || 'Could not assign this project';
+      toast.error(message);
+    } finally {
+      setSavingAssignment(false);
+    }
+  };
+
   const getStatusColor = (status: any) => {
     switch (status) {
       case 'IN_PROGRESS': return 'bg-blue-50 text-blue-700 border-blue-100';
@@ -54,10 +125,13 @@ export default function ProjectsPage() {
           <h1 className="text-2xl font-bold text-slate-900">Project Management</h1>
           <p className="text-slate-500">Track initiatives and team allocations across the organization.</p>
         </div>
-        {isHR && (
-          <button className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all shadow-sm">
+        {canAssignProjects && (
+          <button
+            onClick={() => openAssignModal()}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all shadow-sm"
+          >
             <Plus className="w-4 h-4" />
-            <span>Launch Project</span>
+            <span>Assign Project</span>
           </button>
         )}
       </div>
@@ -115,23 +189,126 @@ export default function ProjectsPage() {
               
               <div className="mt-auto p-4 bg-slate-50 rounded-b-xl border-t border-slate-100 flex items-center justify-between">
                 <div className="flex -space-x-2">
-                  {[1, 2, 3].map(i => (
+                  {[1, 2, 3].slice(0, Math.min(project.assignment_count || 0, 3)).map(i => (
                     <div key={i} className="w-7 h-7 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-500">
                       U{i}
                     </div>
                   ))}
-                  <div className="w-7 h-7 rounded-full border-2 border-white bg-indigo-50 flex items-center justify-center text-[8px] font-bold text-indigo-600">
-                    +2
-                  </div>
+                  {(project.assignment_count || 0) > 3 && (
+                    <div className="w-7 h-7 rounded-full border-2 border-white bg-indigo-50 flex items-center justify-center text-[8px] font-bold text-indigo-600">
+                      +{project.assignment_count - 3}
+                    </div>
+                  )}
                 </div>
-                <button className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
-                  View Details <ChevronRight className="w-3 h-3" />
+                <button
+                  onClick={() => canAssignProjects ? openAssignModal(project.id) : undefined}
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                >
+                  {canAssignProjects ? 'Assign' : 'View Details'} <ChevronRight className="w-3 h-3" />
                 </button>
               </div>
             </div>
           ))
         )}
       </div>
+
+      {showAssignModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
+          <div className="w-full max-w-lg bg-white rounded-lg shadow-xl border border-slate-200">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Assign Project</h2>
+                <p className="text-sm text-slate-500">
+                  {isManager && !isHR ? 'Assign work to your direct reports.' : 'Assign employees to active projects.'}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAssignModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-100"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={submitAssignment} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Project</label>
+                <select
+                  required
+                  value={assignmentForm.project}
+                  onChange={(event) => setAssignmentForm((form) => ({ ...form, project: event.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">Select project</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.project_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Employee</label>
+                <select
+                  required
+                  value={assignmentForm.employee}
+                  onChange={(event) => setAssignmentForm((form) => ({ ...form, employee: event.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">Select employee</option>
+                  {employees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.first_name} {employee.last_name || ''} ({employee.employee_id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Project Role</label>
+                <input
+                  required
+                  value={assignmentForm.role}
+                  onChange={(event) => setAssignmentForm((form) => ({ ...form, role: event.target.value }))}
+                  placeholder="Frontend Developer, QA Lead, Analyst..."
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Assigned Date</label>
+                <input
+                  required
+                  type="date"
+                  value={assignmentForm.assigned_date}
+                  onChange={(event) => setAssignmentForm((form) => ({ ...form, assigned_date: event.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAssignModal(false)}
+                  className="px-4 py-2 rounded-lg border border-slate-300 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingAssignment}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-2"
+                >
+                  {savingAssignment && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Assign
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

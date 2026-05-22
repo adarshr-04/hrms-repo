@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -13,7 +13,8 @@ import {
   GraduationCap,
   Settings,
   LogOut,
-  UserPlus
+  UserPlus,
+  TrendingUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -28,6 +29,7 @@ const navItems = [
   { name: 'Projects', href: '/projects', icon: Briefcase, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
   { name: 'Training', href: '/training', icon: GraduationCap, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
   { name: 'Recruitment', href: '/recruitment', icon: UserPlus, roles: ['SUPER_ADMIN', 'ADMIN', 'HR'] },
+  { name: 'Reports', href: '/reports', icon: TrendingUp, roles: ['SUPER_ADMIN', 'ADMIN', 'HR'] },
   { name: 'Settings', href: '/settings', icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
 ];
 
@@ -36,15 +38,36 @@ export function Sidebar() {
   const { logout, user } = useAuth();
   const userRole = user?.role || 'EMPLOYEE';
 
+  // Read company name from localStorage so it updates when admin saves Company Config
+  const [companyName, setCompanyName] = useState('HRMS Enterprise');
+
+  useEffect(() => {
+    const readCompanyName = () => {
+      try {
+        const saved = localStorage.getItem('companySettings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed?.name) setCompanyName(parsed.name);
+        }
+      } catch {
+        setCompanyName('HRMS Enterprise');
+      }
+    };
+    readCompanyName();
+    // Listen for storage events so changes in other tabs / same-tab saves are picked up
+    window.addEventListener('storage', readCompanyName);
+    return () => window.removeEventListener('storage', readCompanyName);
+  }, []);
+
   const filteredNavItems = navItems.filter(item => item.roles.includes(userRole));
 
   return (
     <div className="flex flex-col h-full w-64 bg-slate-900 text-slate-300 border-r border-slate-800">
       <div className="p-6 flex items-center gap-3">
         <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-          <span className="text-white font-bold">H</span>
+          <span className="text-white font-bold">{companyName.charAt(0).toUpperCase()}</span>
         </div>
-        <span className="text-xl font-bold text-white tracking-tight">HRMS Enterprise</span>
+        <span className="text-xl font-bold text-white tracking-tight truncate">{companyName}</span>
       </div>
 
       <nav className="flex-1 px-4 space-y-1 overflow-y-auto">

@@ -9,6 +9,15 @@ export interface TaskLog {
   remarks?: string;
 }
 
+export interface ProjectAssignmentPayload {
+  employee: number | string;
+  project: number | string;
+  role: string;
+  assigned_date: string;
+  end_date?: string | null;
+  hours_worked?: number;
+}
+
 export const projectService = {
   getProjects: async (params?: { status?: string; search?: string }) => {
     const response = await api.get('/projects/projects/', { params });
@@ -17,6 +26,16 @@ export const projectService = {
 
   getTaskLogs: async () => {
     const response = await api.get('/projects/task-logs/');
+    return response.data;
+  },
+
+  getAssignments: async (params?: { employee?: number | string; project?: number | string }) => {
+    const response = await api.get('/projects/assignments/', { params });
+    return response.data;
+  },
+
+  createAssignment: async (data: ProjectAssignmentPayload) => {
+    const response = await api.post('/projects/assignments/', data);
     return response.data;
   },
 

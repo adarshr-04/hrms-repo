@@ -23,6 +23,7 @@ const routeRules: RouteRule[] = [
   { prefix: "/recruitment", roles: ["ADMIN", "SUPER_ADMIN", "HR"] },
   { prefix: "/settings", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN", "HR"] },
   { prefix: "/notifications", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN", "HR"] },
+  { prefix: "/reports", roles: ["ADMIN", "SUPER_ADMIN", "HR"] },
 ];
 
 export function isRouteAllowed(pathname: string, role: UserRole): boolean {

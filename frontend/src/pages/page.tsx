@@ -14,7 +14,10 @@ import {
   Fingerprint,
   CheckCircle2,
   Wifi,
-  MapPin
+  MapPin,
+  Megaphone,
+  Trash2,
+  X
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
@@ -27,6 +30,7 @@ import { payrollService } from '@/services/payrollService';
 import { leaveService } from '@/services/leaveService';
 import { projectService } from '@/services/projectService';
 import { trainingService } from '@/services/trainingService';
+import { announcementService, Announcement } from '@/services/announcementService';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 
@@ -34,17 +38,80 @@ import { toast } from 'sonner';
 const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 export default function DashboardPage() {
-  const { user, isAdmin, isManager } = useAuth();
+  const { user, isAdmin, isManager, isHR } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any[]>([]);
   const [deptData, setDeptData] = useState<any[]>([]);
   const [attendanceTrend, setAttendanceTrend] = useState<any[]>([]);
+
+  // Announcement States
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
+
+  // Form states for posting announcements
+  const [newAnnTitle, setNewAnnTitle] = useState('');
+  const [newAnnContent, setNewAnnContent] = useState('');
+  const [newAnnPriority, setNewAnnPriority] = useState<'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'>('NORMAL');
+  const [isSubmittingAnnouncement, setIsSubmittingAnnouncement] = useState(false);
 
   // Interactive Daily Tap Terminal States
   const [tapStatus, setTapStatus] = useState<'OFFLINE' | 'TAPPED_IN' | 'COMPLETED'>('OFFLINE');
   const [tapRecord, setTapRecord] = useState<any>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isTapping, setIsTapping] = useState(false);
+
+  const fetchAnnouncements = async () => {
+    setLoadingAnnouncements(true);
+    try {
+      const data = await announcementService.getAll();
+      setAnnouncements(data);
+    } catch (error) {
+      console.error("Failed to fetch announcements", error);
+    } finally {
+      setLoadingAnnouncements(false);
+    }
+  };
+
+  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAnnTitle.trim() || !newAnnContent.trim()) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    setIsSubmittingAnnouncement(true);
+    try {
+      await announcementService.create({
+        title: newAnnTitle,
+        content: newAnnContent,
+        priority: newAnnPriority,
+      });
+      toast.success("Announcement posted successfully!");
+      setIsCreateModalOpen(false);
+      setNewAnnTitle('');
+      setNewAnnContent('');
+      setNewAnnPriority('NORMAL');
+      fetchAnnouncements();
+    } catch (error) {
+      console.error("Failed to create announcement", error);
+      toast.error("Failed to post announcement");
+    } finally {
+      setIsSubmittingAnnouncement(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: number) => {
+    if (!window.confirm("Are you sure you want to delete this announcement?")) return;
+    try {
+      await announcementService.delete(id);
+      toast.success("Announcement deleted successfully");
+      fetchAnnouncements();
+    } catch (error) {
+      console.error("Failed to delete announcement", error);
+      toast.error("Failed to delete announcement");
+    }
+  };
 
   // Live ticking clock
   useEffect(() => {
@@ -76,7 +143,7 @@ export default function DashboardPage() {
 
   // Fetch today's tap status from the database
   const checkTodayTapStatus = async () => {
-    const empId = user?.employee_profile_id || 1; // Fallback to employee PK 1 for demo admins
+    const empId = user?.employee_profile_id;
     if (!empId) return;
     try {
       const todayStr = new Date().toISOString().split('T')[0];
@@ -184,11 +251,26 @@ export default function DashboardPage() {
           const totalLogs = attendanceList.length;
           const attendanceRate = totalLogs > 0 ? Math.round((presentLogs / totalLogs) * 100) : 100;
 
-          // 2. Leave Balance: 24 base days minus total days of approved leaves
+          // 2. Leave Balance: Base days from company settings minus total days of approved leaves
+          let baseLeaveDays = 24;
+          try {
+            const savedCompany = localStorage.getItem('companySettings');
+            if (savedCompany) {
+              const company = JSON.parse(savedCompany);
+              // Extract number from string like "Standard 24 Days"
+              const match = company.leavePolicy?.match(/(\d+)/);
+              if (match) {
+                baseLeaveDays = parseInt(match[1], 10);
+              }
+            }
+          } catch {
+            baseLeaveDays = 24;
+          }
+
           const approvedDays = leavesList
             .filter((l: any) => l.status === 'APPROVED')
             .reduce((sum: number, l: any) => sum + (parseInt(l.total_days) || 0), 0);
-          const leaveBalance = Math.max(0, 24 - approvedDays);
+          const leaveBalance = Math.max(0, baseLeaveDays - approvedDays);
 
           // 3. Active Projects count
           const activeProjectsCount = projectsList.filter((p: any) => p.status === 'IN_PROGRESS' || p.status === 'PLANNING').length;
@@ -233,11 +315,17 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchDashboardData();
     checkTodayTapStatus();
+    fetchAnnouncements();
   }, [isAdmin, isManager, user?.employee_profile_id]);
 
   const handleTap = async () => {
+    const empId = user?.employee_profile_id;
+    if (!empId) {
+      toast.error("Employee profile not found. Attendance cannot be logged.");
+      return;
+    }
+
     setIsTapping(true);
-    const empId = user?.employee_profile_id || 1; // Fallback to employee PK 1 for demo admins
     const todayStr = new Date().toISOString().split('T')[0];
     const timeStr = currentTime.toLocaleTimeString('en-US', { hour12: false });
 
@@ -328,31 +416,113 @@ export default function DashboardPage() {
       {/* Main Grid: Stats & Shift Tap Card */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Left Side: Stats Grid (takes 2 columns) */}
-        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6 h-fit">
-          {stats.map((stat, index) => (
-            <motion.div
-              key={stat.name}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`w-12 h-12 ${stat.color} rounded-lg flex items-center justify-center text-white`}>
-                  <stat.icon className="w-6 h-6" />
+        {/* Left Side: Stats Grid & Announcement Bulletin Board (takes 2 columns) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {stats.map((stat, index) => (
+              <motion.div
+                key={stat.name}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`w-12 h-12 ${stat.color} rounded-lg flex items-center justify-center text-white`}>
+                    <stat.icon className="w-6 h-6" />
+                  </div>
+                  <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${stat.trend === 'up' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                    }`}>
+                    {stat.change}
+                  </div>
                 </div>
-                <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${stat.trend === 'up' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
-                  }`}>
-                  {stat.change}
+                <div>
+                  <p className="text-sm font-medium text-slate-500">{stat.name}</p>
+                  <h3 className="text-2xl font-bold text-slate-900 mt-1">{stat.value}</h3>
                 </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Announcements Bulletin Board */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                <Megaphone className="w-5 h-5 text-indigo-650" />
+                Company Announcements
+              </h3>
+              {isHR && (
+                <button
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-all shadow-sm active:scale-[0.98]"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Post Bulletin</span>
+                </button>
+              )}
+            </div>
+
+            {loadingAnnouncements ? (
+              <div className="py-8 flex justify-center items-center text-slate-400 gap-2">
+                <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
+                <span>Loading bulletins...</span>
               </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500">{stat.name}</p>
-                <h3 className="text-2xl font-bold text-slate-900 mt-1">{stat.value}</h3>
+            ) : announcements.length === 0 ? (
+              <div className="text-center py-8 text-slate-550 border border-dashed border-slate-200 rounded-xl">
+                <Megaphone className="w-8 h-8 text-slate-300 mx-auto mb-2 opacity-50" />
+                <p className="text-sm font-medium">No announcements posted yet</p>
+                <p className="text-xs text-slate-450 mt-1">Keep an eye out for updates from HR.</p>
               </div>
-            </motion.div>
-          ))}
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {announcements.map((ann) => (
+                  <div
+                    key={ann.id}
+                    onClick={() => setSelectedAnnouncement(ann)}
+                    className="p-4 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl transition-all duration-200 cursor-pointer flex flex-col justify-between hover:shadow-md group relative overflow-hidden"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                          ann.priority === 'LOW' ? 'bg-slate-55 border-slate-200 text-slate-600' :
+                          ann.priority === 'NORMAL' ? 'bg-blue-50 border-blue-200 text-blue-600' :
+                          ann.priority === 'HIGH' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                          'bg-rose-50 border-rose-300 text-rose-600 animate-pulse border-2'
+                        }`}>
+                          {ann.priority}
+                        </span>
+                        {isHR && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteAnnouncement(ann.id);
+                            }}
+                            className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-800 line-clamp-1 group-hover:text-indigo-600 transition-colors">
+                          {ann.title}
+                        </h4>
+                        <p className="text-xs text-slate-500 line-clamp-2 mt-1">
+                          {ann.content}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3 text-[10px] font-medium text-slate-400">
+                      <span>By {ann.posted_by_name}</span>
+                      <span>{new Date(ann.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Side: Shift Tap Terminal (takes 1 column) */}
@@ -529,6 +699,144 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Announcement Details Modal */}
+      {selectedAnnouncement && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-lg w-full overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Megaphone className="w-5 h-5 text-indigo-600" />
+                <h3 className="text-lg font-bold text-slate-900">Announcement Details</h3>
+              </div>
+              <button
+                onClick={() => setSelectedAnnouncement(null)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
+              <div className="flex items-center justify-between">
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider border ${
+                  selectedAnnouncement.priority === 'LOW' ? 'bg-slate-50 border-slate-200 text-slate-600' :
+                  selectedAnnouncement.priority === 'NORMAL' ? 'bg-blue-50 border-blue-200 text-blue-600' :
+                  selectedAnnouncement.priority === 'HIGH' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                  'bg-rose-50 border-rose-300 text-rose-600 animate-pulse border-2'
+                }`}>
+                  {selectedAnnouncement.priority} Priority
+                </span>
+                <span className="text-xs text-slate-400 font-medium">
+                  {new Date(selectedAnnouncement.created_at).toLocaleDateString(undefined, {
+                    weekday: 'long',
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
+              </div>
+              <h2 className="text-xl font-bold text-slate-900">{selectedAnnouncement.title}</h2>
+              <p className="text-slate-600 text-sm whitespace-pre-wrap leading-relaxed">
+                {selectedAnnouncement.content}
+              </p>
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+              <span>Posted by: <strong className="text-slate-700">{selectedAnnouncement.posted_by_name}</strong></span>
+              <button
+                onClick={() => setSelectedAnnouncement(null)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-350 text-slate-700 font-bold rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Post Announcement Modal */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <form onSubmit={handleCreateAnnouncement} className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-lg w-full overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Megaphone className="w-5 h-5 text-indigo-600" />
+                <h3 className="text-lg font-bold text-slate-900">Post New Announcement</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Title</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Enter bulletin title"
+                  value={newAnnTitle}
+                  onChange={(e) => setNewAnnTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Priority</label>
+                <select
+                  value={newAnnPriority}
+                  onChange={(e) => setNewAnnPriority(e.target.value as any)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 text-sm focus:outline-none focus:border-indigo-500 bg-white"
+                >
+                  <option value="LOW">Low</option>
+                  <option value="NORMAL">Normal</option>
+                  <option value="HIGH">High</option>
+                  <option value="URGENT">Urgent</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Content</label>
+                <textarea
+                  required
+                  rows={4}
+                  placeholder="Write the announcement message here..."
+                  value={newAnnContent}
+                  onChange={(e) => setNewAnnContent(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-350 text-slate-700 font-bold rounded-lg text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmittingAnnouncement}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm transition-colors flex items-center gap-1.5 shadow-sm active:scale-[0.98]"
+              >
+                {isSubmittingAnnouncement ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Posting...</span>
+                  </>
+                ) : (
+                  <span>Post Announcement</span>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

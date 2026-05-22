@@ -3,6 +3,7 @@ from django.db.models import Q
 from .models import Performance
 from .serializers import PerformanceSerializer
 from accounts.utils import get_user_role
+from accounts.models import Notification
 
 class PerformanceViewSet(viewsets.ModelViewSet):
     queryset = Performance.objects.all()
@@ -42,7 +43,14 @@ class PerformanceViewSet(viewsets.ModelViewSet):
 
         role = get_user_role(user)
         if role in ['SUPER_ADMIN', 'ADMIN', 'HR']:
-            serializer.save()
+            review = serializer.save()
+            if review.employee.user:
+                Notification.objects.create(
+                    user=review.employee.user,
+                    title="New Performance Review",
+                    message=f"A new performance review ({review.rating}/5) has been submitted for you.",
+                    link="/performance"
+                )
             return
 
         if role == 'DEPT_MANAGER':
@@ -55,7 +63,15 @@ class PerformanceViewSet(viewsets.ModelViewSet):
             except Exception:
                 from rest_framework.exceptions import PermissionDenied
                 raise PermissionDenied("Invalid profile lookup.")
-            serializer.save(reviewer=emp_profile)
+            
+            review = serializer.save(reviewer=emp_profile)
+            if review.employee.user:
+                Notification.objects.create(
+                    user=review.employee.user,
+                    title="New Performance Review",
+                    message=f"A new performance review ({review.rating}/5) has been submitted for you by your manager.",
+                    link="/performance"
+                )
             return
 
         from rest_framework.exceptions import PermissionDenied

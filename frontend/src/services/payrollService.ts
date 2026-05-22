@@ -25,6 +25,16 @@ export const payrollService = {
     return response.data;
   },
 
+  bulkGenerate: async (data: { pay_period_start: string; pay_period_end: string; pay_date: string }) => {
+    const response = await api.post('/payroll/payroll/bulk-generate/', data);
+    return response.data;
+  },
+
+  updateStatus: async (id: number | string, status: string) => {
+    const response = await api.patch(`/payroll/payroll/${id}/`, { status });
+    return response.data;
+  },
+
   getStats: async () => {
     // Custom calculation logic for the dashboard
     const response = await api.get('/payroll/payroll/');

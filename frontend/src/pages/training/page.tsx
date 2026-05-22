@@ -259,10 +259,15 @@ export default function TrainingPage() {
                       {!userEnrollment && !isHR && !isAdmin && (
                         <button 
                           onClick={async () => {
+                            if (!user?.employee_profile_id) {
+                              toast.error("Employee profile not found.");
+                              return;
+                            }
+
                             try {
                               await trainingService.enrollEmployee({
                                 training: training.id,
-                                employee: user?.employee_profile_id || 1,
+                                employee: user.employee_profile_id,
                                 status: 'ENROLLED'
                               });
                               toast.success("Successfully registered for course!");

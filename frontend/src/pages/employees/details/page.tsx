@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { 
@@ -22,10 +22,19 @@ import {
   Edit,
   Trash2,
   Plus,
-  UserCheck
+  UserCheck,
+  Upload,
+  Download,
+  File
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { employeeService } from '@/services/employeeService';
+import { attendanceService } from '@/services/attendanceService';
+import { leaveService } from '@/services/leaveService';
+import { payrollService } from '@/services/payrollService';
+import { performanceService } from '@/services/performanceService';
+import { trainingService } from '@/services/trainingService';
+import { documentService, Document as DocType } from '@/services/documentService';
 import { toast } from 'sonner';
 
 export default function EmployeeProfilePage() {
@@ -36,14 +45,38 @@ export default function EmployeeProfilePage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
+  const [attendance, setAttendance] = useState<any[]>([]);
+  const [leaves, setLeaves] = useState<any[]>([]);
+  const [payroll, setPayroll] = useState<any[]>([]);
+  const [performance, setPerformance] = useState<any[]>([]);
+  const [trainings, setTrainings] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<DocType[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [selectedDocType, setSelectedDocType] = useState('Offer Letter');
+  const docInputRef = useRef<HTMLInputElement>(null);
+
   const fetchEmployee = async () => {
     setLoading(true);
     try {
       if (!id) return;
-      const data = await employeeService.getById(id as string);
-      setEmployee(data);
+      const [empData, attData, leaveData, payData, perfData, trainData, docsData] = await Promise.all([
+        employeeService.getById(id as string),
+        attendanceService.getAll({ employee: id }),
+        leaveService.getAll({ employee: id }),
+        payrollService.getAll({ employee: id }),
+        performanceService.getAll({ employee: id }),
+        trainingService.getEnrollments({ employee: id }),
+        documentService.getByEmployee(Number(id))
+      ]);
+      setEmployee(empData);
+      setAttendance(attData.results || attData || []);
+      setLeaves(leaveData.results || leaveData || []);
+      setPayroll(payData.results || payData || []);
+      setPerformance(perfData.results || perfData || []);
+      setTrainings(trainData.results || trainData || []);
+      setDocuments(Array.isArray(docsData) ? docsData : []);
     } catch (error) {
-      console.error("Failed to fetch employee", error);
+      console.error("Failed to fetch employee details", error);
       toast.error("Employee profile not found");
       navigate('/employees');
     } finally {
@@ -75,6 +108,56 @@ export default function EmployeeProfilePage() {
         toast.error("Failed to archive record. Permission denied or server error.");
       }
     }
+  };
+
+  const DOCUMENT_TYPES = [
+    'Offer Letter', 'Employment Contract', 'NDA', 'ID Proof',
+    'Tax Form', 'Resume / CV', 'Certification', 'Other'
+  ];
+
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !employee) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('employee', String(employee.id));
+      formData.append('document_type', selectedDocType);
+      const newDoc = await documentService.upload(formData);
+      setDocuments(prev => [newDoc, ...prev]);
+      toast.success(`"${selectedDocType}" uploaded successfully`);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to upload document');
+    } finally {
+      setUploading(false);
+      if (docInputRef.current) docInputRef.current.value = '';
+    }
+  };
+
+  const handleDocDelete = async (docId: number) => {
+    if (!window.confirm('Are you sure you want to permanently delete this document?')) return;
+    try {
+      await documentService.delete(docId);
+      setDocuments(prev => prev.filter(d => d.id !== docId));
+      toast.success('Document deleted');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete document');
+    }
+  };
+
+  const getFileUrl = (path: string) => {
+    if (!path) return '#';
+    if (path.startsWith('http')) return path;
+    const baseUrl = (import.meta as any).env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
+    return `${baseUrl}${path}`;
+  };
+
+  const getFileName = (path: string) => {
+    if (!path) return 'file';
+    return path.split('/').pop() || 'file';
   };
 
   if (loading) {
@@ -163,9 +246,11 @@ export default function EmployeeProfilePage() {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-10 border-b border-slate-200/60 pb-1">
+      <div className="flex items-center gap-10 border-b border-slate-200/60 pb-1 overflow-x-auto hide-scrollbar">
         <TabButton id="overview" label="Dossier Overview" active={activeTab === 'overview'} onClick={setActiveTab} />
-        <TabButton id="employment" label="Employment Logic" active={activeTab === 'employment'} onClick={setActiveTab} />
+        <TabButton id="activity" label="Attendance & Leaves" active={activeTab === 'activity'} onClick={setActiveTab} />
+        <TabButton id="performance" label="Performance & Payroll" active={activeTab === 'performance'} onClick={setActiveTab} />
+        <TabButton id="training" label="Training" active={activeTab === 'training'} onClick={setActiveTab} />
         <TabButton id="documents" label="Digital Vault" active={activeTab === 'documents'} onClick={setActiveTab} />
       </div>
 
@@ -183,6 +268,14 @@ export default function EmployeeProfilePage() {
                       <DataField label="Alternate Email" value={employee.alternative_email || 'None'} />
                    </div>
                 </Section>
+                <Section title="Organizational Alignment">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <DataField label="Reporting Unit" value={employee.department_name || 'Global'} />
+                      <DataField label="Executive Manager" value={employee.manager_name || 'Self-Directed'} />
+                      <DataField label="Commission Date" value={employee.hire_date || 'N/A'} />
+                      <DataField label="Service Tenure" value="Active Member" />
+                   </div>
+                </Section>
                 <Section title="Residential Details">
                    <div className="space-y-6">
                       <DataField label="Current Registry Address" value={employee.current_address || 'Unspecified'} />
@@ -192,29 +285,159 @@ export default function EmployeeProfilePage() {
              </div>
           )}
 
-          {activeTab === 'employment' && (
+          {activeTab === 'activity' && (
              <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2">
-                <Section title="Organizational Alignment">
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <DataField label="Reporting Unit" value={employee.department_name || 'Global'} />
-                      <DataField label="Executive Manager" value={employee.manager_name || 'Self-Directed'} />
-                      <DataField label="Commission Date" value={employee.hire_date || 'N/A'} />
-                      <DataField label="Service Tenure" value="Active Member" />
+                <Section title="Recent Attendance">
+                   <div className="space-y-4">
+                      {attendance.length === 0 ? <p className="text-sm text-slate-400">No attendance logs found.</p> : attendance.slice(0, 5).map((log: any) => (
+                        <div key={log.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                          <div>
+                            <p className="text-xs font-bold text-slate-900">{log.attendance_date}</p>
+                            <p className="text-[10px] text-slate-500">{log.check_in || '--:--'} to {log.check_out || '--:--'}</p>
+                          </div>
+                          <span className={cn("px-2 py-1 text-[10px] font-bold uppercase rounded-md", log.status === 'PRESENT' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>{log.status}</span>
+                        </div>
+                      ))}
+                   </div>
+                </Section>
+                <Section title="Leave Requests">
+                   <div className="space-y-4">
+                      {leaves.length === 0 ? <p className="text-sm text-slate-400">No leaves found.</p> : leaves.map((leave: any) => (
+                        <div key={leave.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                          <div>
+                            <p className="text-xs font-bold text-slate-900">{leave.leave_type}</p>
+                            <p className="text-[10px] text-slate-500">{leave.start_date} to {leave.end_date}</p>
+                          </div>
+                          <span className="px-2 py-1 text-[10px] font-bold uppercase rounded-md bg-slate-200 text-slate-700">{leave.status}</span>
+                        </div>
+                      ))}
+                   </div>
+                </Section>
+             </div>
+          )}
+
+          {activeTab === 'performance' && (
+             <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2">
+                <Section title="Performance Reviews">
+                   <div className="space-y-4">
+                      {performance.length === 0 ? <p className="text-sm text-slate-400">No reviews found.</p> : performance.map((perf: any) => (
+                        <div key={perf.id} className="flex flex-col gap-2 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                          <div className="flex justify-between items-center">
+                            <p className="text-xs font-bold text-slate-900">{perf.review_date} - By {perf.reviewer_name}</p>
+                            <span className="px-2 py-1 text-[10px] font-bold uppercase rounded-md bg-indigo-100 text-indigo-700">{perf.rating}/5 Stars</span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 italic">"{perf.comments}"</p>
+                        </div>
+                      ))}
+                   </div>
+                </Section>
+                <Section title="Payroll History">
+                   <div className="space-y-4">
+                      {payroll.length === 0 ? <p className="text-sm text-slate-400">No payroll records found.</p> : payroll.map((pay: any) => (
+                        <div key={pay.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                          <div>
+                            <p className="text-xs font-bold text-slate-900">{pay.period_start} to {pay.period_end}</p>
+                            <p className="text-[10px] text-slate-500">Net Pay: {pay.net_pay}</p>
+                          </div>
+                          <span className={cn("px-2 py-1 text-[10px] font-bold uppercase rounded-md", pay.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>{pay.status}</span>
+                        </div>
+                      ))}
+                   </div>
+                </Section>
+             </div>
+          )}
+
+          {activeTab === 'training' && (
+             <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2">
+                <Section title="Training Enrollments">
+                   <div className="space-y-4">
+                      {trainings.length === 0 ? <p className="text-sm text-slate-400">No enrollments found.</p> : trainings.map((enroll: any) => (
+                        <div key={enroll.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                          <div>
+                            <p className="text-xs font-bold text-slate-900">{enroll.training_name || `Training #${enroll.training}`}</p>
+                            <p className="text-[10px] text-slate-500">Enrolled: {enroll.enrollment_date}</p>
+                          </div>
+                          <span className={cn("px-2 py-1 text-[10px] font-bold uppercase rounded-md", enroll.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700')}>{enroll.status}</span>
+                        </div>
+                      ))}
                    </div>
                 </Section>
              </div>
           )}
 
           {activeTab === 'documents' && (
-             <div className="bg-white border border-slate-200/60 rounded-[2rem] p-10 text-center space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto text-slate-300">
-                  <FileText className="w-8 h-8" />
-                </div>
-                <div>
-                   <p className="text-lg font-semibold text-slate-900 tracking-tight">The Digital Vault is Empty</p>
-                   <p className="text-sm text-slate-400 max-w-xs mx-auto mt-1">No secure documents have been uploaded to this personnel dossier yet.</p>
-                </div>
-                <button className="text-indigo-600 font-bold text-sm uppercase tracking-widest hover:underline">Upload Document</button>
+             <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2">
+                <Section title="Upload New Document">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
+                    <div className="space-y-1 flex-1">
+                      <label className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Document Category</label>
+                      <select
+                        value={selectedDocType}
+                        onChange={(e) => setSelectedDocType(e.target.value)}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/10"
+                      >
+                        {DOCUMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <input type="file" ref={docInputRef} onChange={handleDocUpload} className="hidden" />
+                      <button
+                        onClick={() => docInputRef.current?.click()}
+                        disabled={uploading}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-100 disabled:opacity-50"
+                      >
+                        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                        <span>{uploading ? 'Uploading...' : 'Select & Upload'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </Section>
+
+                <Section title={`Stored Documents (${documents.length})`}>
+                  {documents.length === 0 ? (
+                    <div className="text-center py-10 space-y-3">
+                      <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto text-slate-300">
+                        <FileText className="w-8 h-8" />
+                      </div>
+                      <p className="text-lg font-semibold text-slate-900 tracking-tight">The Digital Vault is Empty</p>
+                      <p className="text-sm text-slate-400 max-w-xs mx-auto">No secure documents have been uploaded to this personnel dossier yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {documents.map((doc) => (
+                        <div key={doc.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 hover:bg-slate-100/60 transition-all group">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-500">
+                              <File className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-slate-900">{doc.document_type}</p>
+                              <p className="text-[10px] text-slate-400">{getFileName(doc.file)} &middot; Uploaded {new Date(doc.created_at).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <a
+                              href={getFileUrl(doc.file)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                              title="Download"
+                            >
+                              <Download className="w-4 h-4" />
+                            </a>
+                            <button
+                              onClick={() => handleDocDelete(doc.id)}
+                              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Section>
              </div>
           )}
         </div>

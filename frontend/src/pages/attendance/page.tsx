@@ -60,7 +60,7 @@ export default function AttendancePage() {
   };
 
   const checkTodayTapStatus = async () => {
-    const empId = user?.employee_profile_id || 1; // Fallback to employee PK 1 for demo admins
+    const empId = user?.employee_profile_id;
     if (!empId) return;
     try {
       const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -111,8 +111,13 @@ export default function AttendancePage() {
   }, [user?.employee_profile_id]);
 
   const handleTap = async () => {
+    const empId = user?.employee_profile_id;
+    if (!empId) {
+      toast.error("Employee profile not found. Attendance cannot be logged.");
+      return;
+    }
+
     setIsTapping(true);
-    const empId = user?.employee_profile_id || 1; // Fallback to employee PK 1 for demo admins
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const timeStr = currentTime.toLocaleTimeString('en-US', { hour12: false });
 

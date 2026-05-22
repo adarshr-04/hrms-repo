@@ -1,5 +1,6 @@
 from datetime import date
 
+from django.db.models import Q
 from rest_framework import viewsets, parsers, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, BasePermission, SAFE_METHODS
@@ -7,8 +8,8 @@ from rest_framework.response import Response
 
 import pandas as pd
 
-from .models import Department, Employee
-from .serializers import DepartmentSerializer, EmployeeSerializer
+from .models import Department, Employee, Document
+from .serializers import DepartmentSerializer, EmployeeSerializer, DocumentSerializer
 from accounts.utils import get_user_role
 
 
@@ -36,6 +37,27 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     parser_classes = (parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser)
     filterset_fields = ['department', 'status', 'employment_type']
     search_fields = ['first_name', 'last_name', 'employee_id', 'email']
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or user.is_anonymous:
+            return Employee.objects.none()
+
+        role = get_user_role(user)
+        if role in ['SUPER_ADMIN', 'ADMIN', 'HR']:
+            return Employee.objects.all()
+
+        try:
+            employee = user.employee_profile
+        except Employee.DoesNotExist:
+            return Employee.objects.none()
+
+        if role == 'DEPT_MANAGER':
+            return Employee.objects.filter(
+                Q(id=employee.id) | Q(manager=employee)
+            )
+
+        return Employee.objects.filter(id=employee.id)
 
     # -------------------------------------------------------------------------
     # Fix #9 — Soft delete: terminate instead of hard delete
@@ -182,3 +204,60 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class DocumentViewSet(viewsets.ModelViewSet):
+    queryset = Document.objects.select_related('employee', 'employee__user')
+    serializer_class = DocumentSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+    filterset_fields = ['employee', 'document_type']
+    search_fields = ['document_type']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        role = get_user_role(self.request.user)
+        if role in ['SUPER_ADMIN', 'ADMIN', 'HR']:
+            return queryset
+
+        try:
+            employee = self.request.user.employee_profile
+        except Employee.DoesNotExist:
+            return queryset.none()
+
+        return queryset.filter(employee=employee)
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        role = get_user_role(user)
+        employee = serializer.validated_data.get('employee')
+        
+        # Admin/HR can upload for anyone. Users can only upload for themselves.
+        if role not in ['SUPER_ADMIN', 'ADMIN', 'HR']:
+            try:
+                own_employee = user.employee_profile
+            except Employee.DoesNotExist:
+                own_employee = None
+
+            if not own_employee or employee != own_employee:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("You can only upload documents to your own vault.")
+                
+        serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        user = request.user
+        role = get_user_role(user)
+        instance = self.get_object()
+        
+        if role not in ['SUPER_ADMIN', 'ADMIN', 'HR']:
+            try:
+                own_employee = user.employee_profile
+            except Employee.DoesNotExist:
+                own_employee = None
+
+            if not own_employee or instance.employee != own_employee:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("You can only delete your own documents.")
+                
+        return super().destroy(request, *args, **kwargs)

@@ -18,7 +18,7 @@ import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 
 export default function LeavesPage() {
-  const { user, isAdmin, isManager } = useAuth();
+  const { user, isAdmin, isHR, isManager } = useAuth();
   const [loading, setLoading] = useState(true);
   const [leaves, setLeaves] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('PENDING');
@@ -47,8 +47,8 @@ export default function LeavesPage() {
     try {
       const params: any = { status: activeTab === 'ALL' ? undefined : activeTab };
       
-      // If not admin/manager, only fetch current user's leaves
-      if (!isAdmin && !isManager && user?.employee_profile_id) {
+      // If not admin/HR/manager, only fetch current user's leaves
+      if (!isAdmin && !isHR && !isManager && user?.employee_profile_id) {
         params.employee = user.employee_profile_id;
       }
       
@@ -105,7 +105,7 @@ export default function LeavesPage() {
 
   useEffect(() => {
     fetchLeaves();
-  }, [activeTab, isAdmin, isManager]);
+  }, [activeTab, isAdmin, isHR, isManager]);
 
   const handleStatusUpdate = async (id: any, status: any) => {
     try {
@@ -121,10 +121,10 @@ export default function LeavesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            {isAdmin || isManager ? 'Leave Management' : 'My Leave Requests'}
+            {isAdmin || isHR || isManager ? 'Leave Management' : 'My Leave Requests'}
           </h1>
           <p className="text-slate-500">
-            {isAdmin || isManager ? 'Approve or manage employee time-off requests.' : 'Track and manage your time-off applications.'}
+            {isAdmin || isHR || isManager ? 'Approve or manage employee time-off requests.' : 'Track and manage your time-off applications.'}
           </p>
         </div>
         <button 
@@ -205,7 +205,7 @@ export default function LeavesPage() {
               </div>
 
               <div className="flex items-center gap-2 ml-auto">
-                {leave.status === 'PENDING' && (isAdmin || isManager) ? (
+                {leave.status === 'PENDING' && (isAdmin || isHR || isManager) ? (
                   <>
                     <button 
                       onClick={() => handleStatusUpdate(leave.id, 'REJECTED')}
