@@ -1,0 +1,1 @@
+import{g as e}from"./index-BbENECY5.js";var t={getTrainings:async t=>(await e.get(`/training/trainings/`,{params:t})).data,getEnrollments:async t=>(await e.get(`/training/enrollments/`,{params:t})).data,createTraining:async t=>(await e.post(`/training/trainings/`,t)).data,enrollEmployee:async t=>(await e.post(`/training/enrollments/`,t)).data};export{t};

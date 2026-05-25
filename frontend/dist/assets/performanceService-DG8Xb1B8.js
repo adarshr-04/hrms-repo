@@ -1,0 +1,1 @@
+import{g as e}from"./index-BbENECY5.js";var t={getAll:async t=>(await e.get(`/performance/performance/`,{params:t})).data,create:async t=>(await e.post(`/performance/performance/`,t)).data,update:async(t,n)=>(await e.patch(`/performance/performance/${t}/`,n)).data};export{t};

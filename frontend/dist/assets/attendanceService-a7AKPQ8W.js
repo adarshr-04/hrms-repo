@@ -1,0 +1,1 @@
+import{g as e}from"./index-BbENECY5.js";var t={getAll:async t=>(await e.get(`/attendance/attendance/`,{params:t})).data,logAttendance:async t=>(await e.post(`/attendance/attendance/`,t)).data,updateAttendance:async(t,n)=>(await e.patch(`/attendance/attendance/${t}/`,n)).data,getSummary:async()=>(await e.get(`/attendance/attendance/`)).data};export{t};
