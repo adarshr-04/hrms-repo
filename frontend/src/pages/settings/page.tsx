@@ -85,7 +85,7 @@ export default function SettingsPage() {
       
       if (data.avatar) {
         // Handle absolute vs relative URL
-        const backendBase = 'http://localhost:8000';
+        const backendBase = (import.meta as any).env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
         setAvatarPreview(data.avatar.startsWith('http') ? data.avatar : `${backendBase}${data.avatar}`);
       } else {
         setAvatarPreview(null);
