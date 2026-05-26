@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import JobPosting, Candidate, Application
+from .models import JobPosting, Candidate, Application, Interview
 
 @admin.register(JobPosting)
 class JobPostingAdmin(admin.ModelAdmin):
@@ -17,3 +17,10 @@ class ApplicationAdmin(admin.ModelAdmin):
     list_display = ('candidate', 'job', 'status', 'applied_at')
     list_filter = ('status', 'applied_at')
     search_fields = ('candidate__first_name', 'candidate__last_name', 'job__title')
+
+@admin.register(Interview)
+class InterviewAdmin(admin.ModelAdmin):
+    list_display = ('application', 'interviewer', 'interview_date', 'location', 'status')
+    list_filter = ('status', 'interview_date')
+    search_fields = ('application__candidate__first_name', 'application__candidate__last_name', 'location')
+

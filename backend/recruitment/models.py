@@ -67,3 +67,24 @@ class Application(models.Model):
 
     def __str__(self):
         return f"{self.candidate} - {self.job.title}"
+
+
+class Interview(models.Model):
+    STATUS_CHOICES = [
+        ('SCHEDULED', 'Scheduled'),
+        ('COMPLETED', 'Completed'),
+        ('CANCELLED', 'Cancelled'),
+    ]
+    application = models.ForeignKey(Application, on_delete=models.CASCADE, related_name='interviews')
+    interviewer = models.ForeignKey('employees.Employee', on_delete=models.SET_NULL, null=True, blank=True, related_name='interviews_to_conduct')
+    interview_date = models.DateTimeField()
+    location = models.CharField(max_length=255)  # e.g., "Zoom" or "Room 102"
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='SCHEDULED')
+    feedback = models.TextField(blank=True, null=True)
+    rating = models.IntegerField(blank=True, null=True)  # 1-5 rating
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Interview for {self.application.candidate} on {self.interview_date.strftime('%Y-%m-%d %H:%M')}"
+

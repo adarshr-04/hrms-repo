@@ -149,3 +149,32 @@ def recruitment_application_changed(sender, instance, created, **kwargs):
                 )
     except Exception as e:
         print(f"Error in recruitment signal: {e}")
+
+
+# 6. Recruitment Interview signals
+@receiver(post_save, sender='recruitment.Interview')
+def recruitment_interview_changed(sender, instance, created, **kwargs):
+    try:
+        interviewer = instance.interviewer
+        application = instance.application
+        candidate = application.candidate
+        job = application.job
+
+        if interviewer and interviewer.user:
+            if created:
+                Notification.objects.create(
+                    user=interviewer.user,
+                    title="New Interview Assigned",
+                    message=f"You have been assigned to conduct an interview for candidate {candidate.first_name} {candidate.last_name} ({job.title}) on {instance.interview_date.strftime('%Y-%m-%d %H:%M')}.",
+                    link=f"/recruitment?interview={instance.id}"
+                )
+            elif instance.status == 'CANCELLED':
+                Notification.objects.create(
+                    user=interviewer.user,
+                    title="Interview Cancelled",
+                    message=f"The scheduled interview for candidate {candidate.first_name} {candidate.last_name} ({job.title}) has been cancelled.",
+                    link=f"/recruitment?interview={instance.id}"
+                )
+    except Exception as e:
+        print(f"Error in recruitment interview signal: {e}")
+

@@ -27,8 +27,27 @@ export const attendanceService = {
   },
   
   getSummary: async () => {
-    // This could be a custom endpoint in the future
     const response = await api.get('/attendance/attendance/');
+    return response.data;
+  },
+
+  getShifts: async (): Promise<any[]> => {
+    const response = await api.get('/attendance/shifts/');
+    return response.data.results || response.data;
+  },
+
+  getRequests: async (params?: any): Promise<any[]> => {
+    const response = await api.get('/attendance/requests/', { params });
+    return response.data.results || response.data;
+  },
+
+  createRequest: async (data: any): Promise<any> => {
+    const response = await api.post('/attendance/requests/', data);
+    return response.data;
+  },
+
+  updateRequest: async (id: number | string, data: any): Promise<any> => {
+    const response = await api.patch(`/attendance/requests/${id}/`, data);
     return response.data;
   }
 };

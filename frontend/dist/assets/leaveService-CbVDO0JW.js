@@ -1,1 +1,0 @@
-import{g as e}from"./index-BbENECY5.js";var t={getAll:async t=>(await e.get(`/leaves/leaves/`,{params:t})).data,updateStatus:async(t,n,r)=>(await e.patch(`/leaves/leaves/${t}/`,{status:n,approver:r,approved_date:n===`APPROVED`?new Date().toISOString().split(`T`)[0]:null})).data,create:async t=>(await e.post(`/leaves/leaves/`,t)).data};export{t};

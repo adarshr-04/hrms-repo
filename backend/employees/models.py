@@ -69,6 +69,10 @@ class Employee(BaseModel):
         'self', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='subordinates'
     )
+    shift = models.ForeignKey(
+        'attendance.Shift', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='employees'
+    )
     
     @property
     def get_full_name(self):

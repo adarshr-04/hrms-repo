@@ -20,7 +20,7 @@ const routeRules: RouteRule[] = [
   { prefix: "/training", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN", "HR"] },
 
   { prefix: "/payroll", roles: ["ADMIN", "SUPER_ADMIN", "HR"] },
-  { prefix: "/recruitment", roles: ["ADMIN", "SUPER_ADMIN", "HR"] },
+  { prefix: "/recruitment", roles: ["ADMIN", "SUPER_ADMIN", "HR", "DEPT_MANAGER", "EMPLOYEE"] },
   { prefix: "/settings", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN", "HR"] },
   { prefix: "/notifications", roles: ["ADMIN", "DEPT_MANAGER", "EMPLOYEE", "SUPER_ADMIN", "HR"] },
   { prefix: "/reports", roles: ["ADMIN", "SUPER_ADMIN", "HR"] },

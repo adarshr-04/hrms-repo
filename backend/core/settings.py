@@ -24,10 +24,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-p)56=220m5g@l+jrd=)nx#xp@gv_bbids7u@2_n-%%tp45)w'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = False            # Set to False in production and True in development.
 
-ALLOWED_HOSTS = ['3.111.31.237', 'hrmspirlanta.ai', 'www.hrmspirlanta.ai', '127.0.0.1', 'localhost']
-
+#ALLOWED_HOSTS = ['3.111.31.237', 'hrmspirlanta.ai', 'www.hrmspirlanta.ai', '127.0.0.1', 'localhost']
+ALLOWED_HOSTS = ['3.111.31.237', "127.0.0.1", "localhost"]  # Update with your actual domain names in production.
 # Application definition
 
 INSTALLED_APPS = [
@@ -130,7 +130,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Media files (Employee Avatars, Documents)

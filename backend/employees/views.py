@@ -42,22 +42,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not user or user.is_anonymous:
             return Employee.objects.none()
-
-        role = get_user_role(user)
-        if role in ['SUPER_ADMIN', 'ADMIN', 'HR']:
-            return Employee.objects.all()
-
-        try:
-            employee = user.employee_profile
-        except Employee.DoesNotExist:
-            return Employee.objects.none()
-
-        if role == 'DEPT_MANAGER':
-            return Employee.objects.filter(
-                Q(id=employee.id) | Q(manager=employee)
-            )
-
-        return Employee.objects.filter(id=employee.id)
+        return Employee.objects.all()
 
     # -------------------------------------------------------------------------
     # Fix #9 — Soft delete: terminate instead of hard delete

@@ -28,7 +28,7 @@ const navItems = [
   { name: 'Performance', href: '/performance', icon: BarChart3, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
   { name: 'Projects', href: '/projects', icon: Briefcase, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
   { name: 'Training', href: '/training', icon: GraduationCap, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
-  { name: 'Recruitment', href: '/recruitment', icon: UserPlus, roles: ['SUPER_ADMIN', 'ADMIN', 'HR'] },
+  { name: 'Recruitment', href: '/recruitment', icon: UserPlus, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
   { name: 'Reports', href: '/reports', icon: TrendingUp, roles: ['SUPER_ADMIN', 'ADMIN', 'HR'] },
   { name: 'Settings', href: '/settings', icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
 ];
@@ -73,6 +73,7 @@ export function Sidebar() {
       <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
         {filteredNavItems.map((item) => {
           const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
+          const label = item.name === 'Recruitment' && (userRole === 'EMPLOYEE' || userRole === 'DEPT_MANAGER') ? 'Interviews' : item.name;
           return (
             <Link key={item.name}
               to={item.href}
@@ -87,7 +88,8 @@ export function Sidebar() {
                 "w-5 h-5",
                 isActive ? "text-indigo-500" : "text-slate-400 group-hover:text-indigo-400"
               )} />
-              <span>{item.name}</span>
+              <span>{label}</span>
+
               {isActive && (
                 <div className="ml-auto w-1.5 h-1.5 bg-indigo-500 rounded-full" />
               )}
