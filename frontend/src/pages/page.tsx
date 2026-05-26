@@ -43,6 +43,15 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<any[]>([]);
   const [deptData, setDeptData] = useState<any[]>([]);
   const [attendanceTrend, setAttendanceTrend] = useState<any[]>([]);
+  
+  // Dynamic client-side filter states
+  const [rawEmployees, setRawEmployees] = useState<any[]>([]);
+  const [rawAttendance, setRawAttendance] = useState<any[]>([]);
+  const [rawLeaves, setRawLeaves] = useState<any[]>([]);
+  const [rawProjects, setRawProjects] = useState<any[]>([]);
+  const [rawEnrollments, setRawEnrollments] = useState<any[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
+  const [selectedDept, setSelectedDept] = useState<string>('ALL');
 
   // Announcement States
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -168,7 +177,6 @@ export default function DashboardPage() {
     setLoading(true);
     try {
       if (isAdmin || isManager) {
-        // Fetch all core datasets in parallel
         const [employees, attendance, leaves, projects] = await Promise.all([
           employeeService.getAll(),
           attendanceService.getAll(),
@@ -176,62 +184,11 @@ export default function DashboardPage() {
           projectService.getProjects()
         ]);
 
-        const empList = Array.isArray(employees) ? employees : (employees.results || []);
-        const attendanceList = Array.isArray(attendance) ? attendance : (attendance.results || []);
-        const leavesList = Array.isArray(leaves) ? leaves : (leaves.results || []);
-        const projectsList = Array.isArray(projects) ? projects : (projects.results || []);
-
-        // 1. Calculate stats values
-        const totalEmployees = empList.length;
-        
-        // Find Present Today Count (Active logs for today's date)
-        const todayStr = new Date().toISOString().split('T')[0];
-        const todayAttendance = attendanceList.filter((a: any) => a.attendance_date === todayStr && a.status !== 'ABSENT');
-        const presentCount = todayAttendance.length;
-
-        const pendingLeavesCount = leavesList.filter((l: any) => l.status === 'PENDING').length;
-        const activeProjectsCount = projectsList.filter((p: any) => p.status === 'IN_PROGRESS' || p.status === 'PLANNING').length;
-
-        setStats([
-          { name: 'Total Employees', value: totalEmployees, change: `+${empList.filter((e: any) => e.status === 'ACTIVE').length}`, trend: 'up', icon: Users, color: 'bg-blue-500' },
-          { name: 'Present Today', value: presentCount, change: `${totalEmployees > 0 ? Math.round((presentCount / totalEmployees) * 100) : 0}% Rate`, trend: 'up', icon: Calendar, color: 'bg-emerald-500' },
-          { name: 'Pending Leaves', value: pendingLeavesCount, change: `${leavesList.filter((l: any) => l.status === 'APPROVED').length} Approved`, trend: pendingLeavesCount > 0 ? 'up' : 'down', icon: Clock, color: 'bg-amber-500' },
-          { name: 'Active Projects', value: activeProjectsCount, change: `${projectsList.filter((p: any) => p.status === 'COMPLETED').length} Done`, trend: 'up', icon: Briefcase, color: 'bg-indigo-500' },
-        ]);
-
-        // 2. Calculate Live Department Breakdown
-        const depts = empList.reduce((acc: any, curr: any) => {
-          const name = curr.department_name || 'Unassigned';
-          acc[name] = (acc[name] || 0) + 1;
-          return acc;
-        }, {});
-        setDeptData(Object.keys(depts).map(name => ({ name, value: depts[name] })));
-
-        // 3. Calculate Real Historical Attendance Trend (Last 5 days of activity)
-        const uniqueDates = Array.from(new Set(attendanceList.map((a: any) => a.attendance_date)))
-          .sort()
-          .slice(-5);
-
-        const trendData = uniqueDates.map(dateStr => {
-          const dateObj = new Date(dateStr as string);
-          const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
-          const dayLogs = attendanceList.filter((a: any) => a.attendance_date === dateStr);
-          const presentLogs = dayLogs.filter((a: any) => a.status === 'PRESENT' || a.status === 'LATE' || a.status === 'HALF_DAY');
-          const percentage = dayLogs.length > 0 ? Math.round((presentLogs.length / dayLogs.length) * 100) : 0;
-          return { name: dayName, present: percentage };
-        });
-
-        const finalTrend = trendData.length >= 2 ? trendData : [
-          { name: 'Mon', present: 92 },
-          { name: 'Tue', present: 95 },
-          { name: 'Wed', present: 98 },
-          { name: 'Thu', present: 94 },
-          { name: 'Fri', present: 96 },
-        ];
-        setAttendanceTrend(finalTrend);
-
+        setRawEmployees(Array.isArray(employees) ? employees : (employees.results || []));
+        setRawAttendance(Array.isArray(attendance) ? attendance : (attendance.results || []));
+        setRawLeaves(Array.isArray(leaves) ? leaves : (leaves.results || []));
+        setRawProjects(Array.isArray(projects) ? projects : (projects.results || []));
       } else {
-        // Personal Dashboard for Employee
         const empId = user?.employee_profile_id;
         if (empId) {
           const [attendance, leaves, projects, enrollments] = await Promise.all([
@@ -241,68 +198,10 @@ export default function DashboardPage() {
             trainingService.getEnrollments({ employee: empId })
           ]);
 
-          const attendanceList = Array.isArray(attendance) ? attendance : (attendance.results || []);
-          const leavesList = Array.isArray(leaves) ? leaves : (leaves.results || []);
-          const projectsList = Array.isArray(projects) ? projects : (projects.results || []);
-          const enrollmentList = Array.isArray(enrollments) ? enrollments : (enrollments.results || []);
-
-          // 1. Attendance Rate
-          const presentLogs = attendanceList.filter((a: any) => a.status === 'PRESENT' || a.status === 'LATE' || a.status === 'HALF_DAY').length;
-          const totalLogs = attendanceList.length;
-          const attendanceRate = totalLogs > 0 ? Math.round((presentLogs / totalLogs) * 100) : 100;
-
-          // 2. Leave Balance: Base days from company settings minus total days of approved leaves
-          let baseLeaveDays = 24;
-          try {
-            const savedCompany = localStorage.getItem('companySettings');
-            if (savedCompany) {
-              const company = JSON.parse(savedCompany);
-              // Extract number from string like "Standard 24 Days"
-              const match = company.leavePolicy?.match(/(\d+)/);
-              if (match) {
-                baseLeaveDays = parseInt(match[1], 10);
-              }
-            }
-          } catch {
-            baseLeaveDays = 24;
-          }
-
-          const approvedDays = leavesList
-            .filter((l: any) => l.status === 'APPROVED')
-            .reduce((sum: number, l: any) => sum + (parseInt(l.total_days) || 0), 0);
-          const leaveBalance = Math.max(0, baseLeaveDays - approvedDays);
-
-          // 3. Active Projects count
-          const activeProjectsCount = projectsList.filter((p: any) => p.status === 'IN_PROGRESS' || p.status === 'PLANNING').length;
-
-          // 4. Training Progress rate: percentage of COMPLETED enrollments
-          const completedEnrollments = enrollmentList.filter((e: any) => e.status === 'COMPLETED').length;
-          const totalEnrollments = enrollmentList.length;
-          const trainingRate = totalEnrollments > 0 ? Math.round((completedEnrollments / totalEnrollments) * 100) : 0;
-
-          setStats([
-            { name: 'My Attendance', value: `${attendanceRate}%`, change: 'Live presence rate', trend: 'up', icon: Calendar, color: 'bg-emerald-500' },
-            { name: 'Leave Balance', value: `${leaveBalance} Days`, change: `${leavesList.filter((l: any) => l.status === 'PENDING').length} Pending request(s)`, trend: 'up', icon: Clock, color: 'bg-amber-500' },
-            { name: 'My Projects', value: `${activeProjectsCount} Active`, change: 'Assigned initiatives', trend: 'up', icon: Briefcase, color: 'bg-indigo-500' },
-            { name: 'Training Progress', value: `${trainingRate}%`, change: `${completedEnrollments}/${totalEnrollments} Completed`, trend: 'up', icon: GraduationCap, color: 'bg-blue-500' },
-          ]);
-
-          // Real Attendance Trend (last 5 logs for this employee)
-          const trendData = attendanceList
-            .slice(-5)
-            .map((log: any) => {
-              const dayName = new Date(log.attendance_date).toLocaleDateString('en-US', { weekday: 'short' });
-              return { name: dayName, present: log.status === 'PRESENT' || log.status === 'LATE' || log.status === 'HALF_DAY' ? 100 : 0 };
-            });
-
-          const finalTrend = trendData.length >= 2 ? trendData : [
-            { name: 'Mon', present: 100 },
-            { name: 'Tue', present: 100 },
-            { name: 'Wed', present: 100 },
-            { name: 'Thu', present: 100 },
-            { name: 'Fri', present: 100 },
-          ];
-          setAttendanceTrend(finalTrend);
+          setRawAttendance(Array.isArray(attendance) ? attendance : (attendance.results || []));
+          setRawLeaves(Array.isArray(leaves) ? leaves : (leaves.results || []));
+          setRawProjects(Array.isArray(projects) ? projects : (projects.results || []));
+          setRawEnrollments(Array.isArray(enrollments) ? enrollments : (enrollments.results || []));
         }
       }
     } catch (error) {
@@ -311,6 +210,156 @@ export default function DashboardPage() {
       setLoading(false);
     }
   };
+
+  // Reactive visual analytics calculator
+  useEffect(() => {
+    if (loading) return;
+
+    if (isAdmin || isManager) {
+      const employeeDeptMap = new Map();
+      rawEmployees.forEach((emp: any) => {
+        employeeDeptMap.set(emp.id, emp.department_name || 'Unassigned');
+      });
+
+      // Filter employees by department
+      let filteredEmpList = rawEmployees;
+      if (selectedDept !== 'ALL') {
+        filteredEmpList = rawEmployees.filter((e: any) => (e.department_name || 'Unassigned') === selectedDept);
+      }
+
+      // Filter attendance by department and month
+      let filteredAttendanceList = rawAttendance;
+      if (selectedDept !== 'ALL') {
+        filteredAttendanceList = filteredAttendanceList.filter((a: any) => {
+          const dept = employeeDeptMap.get(a.employee) || 'Unassigned';
+          return dept === selectedDept;
+        });
+      }
+      if (selectedMonth !== 'ALL') {
+        filteredAttendanceList = filteredAttendanceList.filter((a: any) => {
+          if (!a.attendance_date) return false;
+          const month = a.attendance_date.split('-')[1]; // YYYY-MM-DD
+          return Number(month) === Number(selectedMonth);
+        });
+      }
+
+      // Filter leaves by department
+      let filteredLeavesList = rawLeaves;
+      if (selectedDept !== 'ALL') {
+        filteredLeavesList = rawLeaves.filter((l: any) => {
+          const dept = employeeDeptMap.get(l.employee) || 'Unassigned';
+          return dept === selectedDept;
+        });
+      }
+
+      // Dynamic stats calculation
+      const totalEmployees = filteredEmpList.length;
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todayAttendance = filteredAttendanceList.filter((a: any) => a.attendance_date === todayStr && a.status !== 'ABSENT');
+      const presentCount = todayAttendance.length;
+
+      const pendingLeavesCount = filteredLeavesList.filter((l: any) => l.status === 'PENDING').length;
+      const activeProjectsCount = rawProjects.filter((p: any) => p.status === 'IN_PROGRESS' || p.status === 'PLANNING').length;
+
+      setStats([
+        { name: 'Total Employees', value: totalEmployees, change: `+${filteredEmpList.filter((e: any) => e.status === 'ACTIVE').length} Active`, trend: 'up', icon: Users, color: 'bg-blue-500' },
+        { name: 'Present Today', value: presentCount, change: `${totalEmployees > 0 ? Math.round((presentCount / totalEmployees) * 100) : 0}% Rate`, trend: 'up', icon: Calendar, color: 'bg-emerald-500' },
+        { name: 'Pending Leaves', value: pendingLeavesCount, change: `${filteredLeavesList.filter((l: any) => l.status === 'APPROVED').length} Approved`, trend: pendingLeavesCount > 0 ? 'up' : 'down', icon: Clock, color: 'bg-amber-500' },
+        { name: 'Active Projects', value: activeProjectsCount, change: `${rawProjects.filter((p: any) => p.status === 'COMPLETED').length} Done`, trend: 'up', icon: Briefcase, color: 'bg-indigo-500' },
+      ]);
+
+      // Department breakdowns
+      const depts = filteredEmpList.reduce((acc: any, curr: any) => {
+        const name = curr.department_name || 'Unassigned';
+        acc[name] = (acc[name] || 0) + 1;
+        return acc;
+      }, {});
+      setDeptData(Object.keys(depts).map(name => ({ name, value: depts[name] })));
+
+      // Real historical attendance trends (dynamic last 5 days)
+      const uniqueDates = Array.from(new Set(filteredAttendanceList.map((a: any) => a.attendance_date)))
+        .sort()
+        .slice(-5);
+
+      const trendData = uniqueDates.map(dateStr => {
+        const dateObj = new Date(dateStr as string);
+        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+        const dayLogs = filteredAttendanceList.filter((a: any) => a.attendance_date === dateStr);
+        const presentLogs = dayLogs.filter((a: any) => a.status === 'PRESENT' || a.status === 'LATE' || a.status === 'HALF_DAY');
+        const percentage = dayLogs.length > 0 ? Math.round((presentLogs.length / dayLogs.length) * 100) : 0;
+        return { name: dayName, present: percentage };
+      });
+
+      const finalTrend = trendData.length >= 2 ? trendData : [
+        { name: 'Mon', present: 92 },
+        { name: 'Tue', present: 95 },
+        { name: 'Wed', present: 98 },
+        { name: 'Thu', present: 94 },
+        { name: 'Fri', present: 96 },
+      ];
+      setAttendanceTrend(finalTrend);
+    } else {
+      // Personal Employee dashboard
+      let filteredAttendance = rawAttendance;
+      if (selectedMonth !== 'ALL') {
+        filteredAttendance = rawAttendance.filter((a: any) => {
+          if (!a.attendance_date) return false;
+          const month = a.attendance_date.split('-')[1];
+          return Number(month) === Number(selectedMonth);
+        });
+      }
+
+      const presentLogs = filteredAttendance.filter((a: any) => a.status === 'PRESENT' || a.status === 'LATE' || a.status === 'HALF_DAY').length;
+      const totalLogs = filteredAttendance.length;
+      const attendanceRate = totalLogs > 0 ? Math.round((presentLogs / totalLogs) * 100) : 100;
+
+      let baseLeaveDays = 24;
+      try {
+        const savedCompany = localStorage.getItem('companySettings');
+        if (savedCompany) {
+          const company = JSON.parse(savedCompany);
+          const match = company.leavePolicy?.match(/(\d+)/);
+          if (match) baseLeaveDays = parseInt(match[1], 10);
+        }
+      } catch {
+        baseLeaveDays = 24;
+      }
+
+      const approvedDays = rawLeaves
+        .filter((l: any) => l.status === 'APPROVED')
+        .reduce((sum: number, l: any) => sum + (parseInt(l.total_days) || 0), 0);
+      const leaveBalance = Math.max(0, baseLeaveDays - approvedDays);
+
+      const activeProjectsCount = rawProjects.filter((p: any) => p.status === 'IN_PROGRESS' || p.status === 'PLANNING').length;
+
+      const completedEnrollments = rawEnrollments.filter((e: any) => e.status === 'COMPLETED').length;
+      const totalEnrollments = rawEnrollments.length;
+      const trainingRate = totalEnrollments > 0 ? Math.round((completedEnrollments / totalEnrollments) * 100) : 0;
+
+      setStats([
+        { name: 'My Attendance', value: `${attendanceRate}%`, change: 'Live presence rate', trend: 'up', icon: Calendar, color: 'bg-emerald-500' },
+        { name: 'Leave Balance', value: `${leaveBalance} Days`, change: `${rawLeaves.filter((l: any) => l.status === 'PENDING').length} Pending request(s)`, trend: 'up', icon: Clock, color: 'bg-amber-500' },
+        { name: 'My Projects', value: `${activeProjectsCount} Active`, change: 'Assigned initiatives', trend: 'up', icon: Briefcase, color: 'bg-indigo-500' },
+        { name: 'Training Progress', value: `${trainingRate}%`, change: `${completedEnrollments}/${totalEnrollments} Completed`, trend: 'up', icon: GraduationCap, color: 'bg-blue-500' },
+      ]);
+
+      const trendData = filteredAttendance
+        .slice(-5)
+        .map((log: any) => {
+          const dayName = new Date(log.attendance_date).toLocaleDateString('en-US', { weekday: 'short' });
+          return { name: dayName, present: log.status === 'PRESENT' || log.status === 'LATE' || log.status === 'HALF_DAY' ? 100 : 0 };
+        });
+
+      const finalTrend = trendData.length >= 2 ? trendData : [
+        { name: 'Mon', present: 100 },
+        { name: 'Tue', present: 100 },
+        { name: 'Wed', present: 100 },
+        { name: 'Thu', present: 100 },
+        { name: 'Fri', present: 100 },
+      ];
+      setAttendanceTrend(finalTrend);
+    }
+  }, [rawEmployees, rawAttendance, rawLeaves, rawProjects, rawEnrollments, selectedMonth, selectedDept, loading, isAdmin, isManager]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -638,12 +687,62 @@ export default function DashboardPage() {
 
       </div>
 
+      {/* Interactive Filters Panel */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h3 className="font-extrabold text-slate-800 text-sm">Analytics & Metrics Control</h3>
+          <p className="text-xs text-slate-400 font-semibold mt-0.5">Filter data dynamically in real-time across charts and counters.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Month Selector */}
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-250 rounded-xl px-3 py-1.5 shadow-sm">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Month</span>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-transparent border-none text-xs font-bold text-slate-700 outline-none cursor-pointer"
+            >
+              <option value="ALL">All Months</option>
+              <option value="01">January</option>
+              <option value="02">February</option>
+              <option value="03">March</option>
+              <option value="04">April</option>
+              <option value="05">May</option>
+              <option value="06">June</option>
+              <option value="07">July</option>
+              <option value="08">August</option>
+              <option value="09">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+          </div>
+
+          {/* Department Selector */}
+          {(isAdmin || isManager) && (
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-250 rounded-xl px-3 py-1.5 shadow-sm">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Dept</span>
+              <select
+                value={selectedDept}
+                onChange={(e) => setSelectedDept(e.target.value)}
+                className="bg-transparent border-none text-xs font-bold text-slate-700 outline-none cursor-pointer"
+              >
+                <option value="ALL">All Departments</option>
+                {Array.from(new Set(rawEmployees.map((e: any) => e.department_name).filter(Boolean))).map((dept: any) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Attendance Trend */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-indigo-600" />
+            <Calendar className="w-5 h-5 text-indigo-650" />
             Weekly Attendance Flow
           </h3>
           <div className="h-[300px] w-full min-h-[300px]">

@@ -208,6 +208,17 @@ export default function SettingsPage() {
     }
   };
 
+  const handleThemeChange = (newTheme: 'light' | 'dark') => {
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    toast.success(`Switched to ${newTheme === 'dark' ? 'Dark' : 'Light'} theme!`);
+  };
+
   const handleSavePreferences = () => {
     localStorage.setItem('theme', theme);
     // Apply theme preference to document classlist for real-time toggle
@@ -606,14 +617,30 @@ export default function SettingsPage() {
                       <h4 className="text-sm font-bold text-slate-800">Interface Display</h4>
                       <p className="text-xs text-slate-400 font-semibold mt-0.5">Toggle visual elements of the workspace dashboard.</p>
                     </div>
-                    <select
-                      value={theme}
-                      onChange={(e) => setTheme(e.target.value as any)}
-                      className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 cursor-pointer"
-                    >
-                      <option value="light">☀️ Light Theme</option>
-                      <option value="dark">🌙 Dark Theme (Simulated)</option>
-                    </select>
+                    <div className="flex bg-slate-100 rounded-xl p-1 gap-1 border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => handleThemeChange('light')}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          theme === 'light'
+                            ? 'bg-white text-slate-900 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        ☀️ Light
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleThemeChange('dark')}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          theme === 'dark'
+                            ? 'bg-slate-900 text-white shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        🌙 Dark
+                      </button>
+                    </div>
                   </div>
 
                   {/* Language Selection */}

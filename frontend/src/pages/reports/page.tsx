@@ -108,12 +108,22 @@ function WorkforcePanel({ year }: { year: string }) {
         </ChartCard>
 
         <ChartCard title="Status Distribution">
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={300}>
             <PieChart>
-              <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}>
+              <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={80} innerRadius={40} paddingAngle={2}>
                 {statusData.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
               </Pie>
-              <Tooltip />
+              <Tooltip
+                contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
+                formatter={(value: any, name: any) => [`${value} employees`, name]}
+              />
+              <Legend
+                verticalAlign="bottom"
+                align="center"
+                iconType="circle"
+                iconSize={8}
+                wrapperStyle={{ fontSize: 11, fontWeight: 600, paddingTop: 12 }}
+              />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -131,14 +141,23 @@ function WorkforcePanel({ year }: { year: string }) {
         </ChartCard>
 
         <ChartCard title="Gender Distribution">
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie data={data.by_gender.map(g => ({ name: genderLabels[g.gender] || g.gender, value: g.count }))}
-                dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}
-                label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}>
+                dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={75} innerRadius={35} paddingAngle={2}>
                 {data.by_gender.map((_, i) => <Cell key={i} fill={COLORS[i + 3]} />)}
               </Pie>
-              <Tooltip />
+              <Tooltip
+                contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
+                formatter={(value: any, name: any) => [`${value} employees`, name]}
+              />
+              <Legend
+                verticalAlign="bottom"
+                align="center"
+                iconType="circle"
+                iconSize={8}
+                wrapperStyle={{ fontSize: 11, fontWeight: 600, paddingTop: 12 }}
+              />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -257,14 +276,23 @@ function LeavesPanel({ year }: { year: string }) {
         </ChartCard>
 
         <ChartCard title="Status Distribution">
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie data={data.by_status.map(s => ({ name: s.status, value: s.count }))}
-                dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}
-                label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}>
+                dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={80} innerRadius={40} paddingAngle={2}>
                 {data.by_status.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
               </Pie>
-              <Tooltip />
+              <Tooltip
+                contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
+                formatter={(value: any, name: any) => [`${value} requests`, name]}
+              />
+              <Legend
+                verticalAlign="bottom"
+                align="center"
+                iconType="circle"
+                iconSize={8}
+                wrapperStyle={{ fontSize: 11, fontWeight: 600, paddingTop: 12 }}
+              />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>

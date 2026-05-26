@@ -21,6 +21,8 @@ import { payrollService } from '@/services/payrollService';
 import { employeeService } from '@/services/employeeService';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 
 export default function PayrollPage() {
   const [loading, setLoading] = useState(true);
@@ -214,6 +216,43 @@ export default function PayrollPage() {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    const element = document.getElementById('payslip-modal-content');
+    if (!element) {
+      toast.error("Payslip content not found.");
+      return;
+    }
+    
+    const loadingToast = toast.loading("Generating your high-fidelity PDF statement...");
+    
+    try {
+      // Capture the element using html2canvas with 2x scale for crisp font rendering
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      
+      // jsPDF: A4 size is 210mm x 297mm
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      
+      const fileName = `payslip_${(selectedRecord.employee_name || 'employee').replace(/\s+/g, '_')}_${selectedRecord.pay_period_start}.pdf`;
+      pdf.save(fileName);
+      
+      toast.dismiss(loadingToast);
+      toast.success("Payslip PDF downloaded successfully!");
+    } catch (error) {
+      console.error("PDF generation failed", error);
+      toast.dismiss(loadingToast);
+      toast.error("Could not generate PDF statement.");
+    }
+  };
 
   const formatCurrency = (amount: any) => {
     return new Intl.NumberFormat('en-IN', {
@@ -695,8 +734,9 @@ export default function PayrollPage() {
       {showDetailModal && selectedRecord && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden">
-            {/* Header */}
-            <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
+            <div id="payslip-modal-content" className="bg-white">
+              {/* Header */}
+              <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-black tracking-widest bg-indigo-600 text-white px-2 py-0.5 rounded uppercase">Salary Receipt</span>
                 <h3 className="text-lg font-black tracking-tight mt-1">HRMS Enterprise</h3>
@@ -781,6 +821,7 @@ export default function PayrollPage() {
                 )}
               </div>
             </div>
+            </div>
 
             {/* Footer buttons */}
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
@@ -825,10 +866,18 @@ export default function PayrollPage() {
               <div className="flex gap-2">
                 <button 
                   type="button"
+                  onClick={handleDownloadPDF}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-all shadow-sm shadow-emerald-200"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download PDF
+                </button>
+                <button 
+                  type="button"
                   onClick={() => {
                     window.print();
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition-all shadow-sm shadow-indigo-200"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition-all shadow-sm"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Print
