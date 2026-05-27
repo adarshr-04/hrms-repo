@@ -107,7 +107,7 @@ export default function AttendancePage() {
   // ── Office zone config (change to your actual office coordinates) ──
   const OFFICE_LAT    = 12.906245151822224;   // Office latitude
   const OFFICE_LNG    = 77.57907788025564;    // Office longitude
-  const OFFICE_RADIUS = 500;                  // Radius in metres
+  const OFFICE_RADIUS = 300;                  // Radius in metres
 
   const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
     const R = 6371000; // Earth radius in metres

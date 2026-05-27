@@ -57,6 +57,9 @@ export default function PayrollPage() {
     pay_date: new Date().toISOString().split('T')[0]
   });
 
+  // Client-side search filter
+  const [payrollSearchQ, setPayrollSearchQ] = useState('');
+
   const fetchPayroll = async () => {
     setLoading(true);
     try {
@@ -372,6 +375,8 @@ export default function PayrollPage() {
             <input 
               type="text" 
               placeholder="Filter by employee or pay period..." 
+              value={payrollSearchQ}
+              onChange={e => setPayrollSearchQ(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all font-medium"
             />
           </div>
@@ -416,7 +421,13 @@ export default function PayrollPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {payrollData.map((record) => (
+                {payrollData.filter(r => {
+                  if (!payrollSearchQ) return true;
+                  const q = payrollSearchQ.toLowerCase();
+                  return (r.employee_name || '').toLowerCase().includes(q)
+                    || (r.pay_period_start || '').includes(q)
+                    || (r.pay_period_end || '').includes(q);
+                }).map((record) => (
                   <tr key={record.id} className="hover:bg-slate-50/30 transition-all group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
