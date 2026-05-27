@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Users,
   Calendar,
@@ -17,7 +18,12 @@ import {
   MapPin,
   Megaphone,
   Trash2,
-  X
+  X,
+  ChevronDown,
+  FileEdit,
+  CalendarCheck,
+  Radio,
+  Shield
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
@@ -66,10 +72,36 @@ export default function DashboardPage() {
   const [isSubmittingAnnouncement, setIsSubmittingAnnouncement] = useState(false);
 
   // Interactive Daily Tap Terminal States
-  const [tapStatus, setTapStatus] = useState<'OFFLINE' | 'TAPPED_IN' | 'COMPLETED'>('OFFLINE');
+  const [tapStatus, setTapStatus] = useState<'OFFLINE' | 'TAPPED_IN' | 'TAPPED_OUT'>('OFFLINE');
   const [tapRecord, setTapRecord] = useState<any>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isTapping, setIsTapping] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+
+  // GPS Geofencing States (aligned with Attendance page)
+  const [gpsLocked, setGpsLocked] = useState(false);
+  const [userLat, setUserLat] = useState<number | null>(null);
+  const [userLng, setUserLng] = useState<number | null>(null);
+  const [insideZone, setInsideZone] = useState<boolean | null>(null);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const isBefore6PM = currentTime.getHours() < 18;
+
+  // Office zone config (must match Attendance page)
+  const OFFICE_LAT = 12.906245151822224;
+  const OFFICE_LNG = 77.57907788025564;
+  const OFFICE_RADIUS = 300;
+
+  const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371000;
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
+  const navigate = useNavigate();
 
   const fetchAnnouncements = async () => {
     setLoadingAnnouncements(true);
@@ -128,6 +160,34 @@ export default function DashboardPage() {
     return () => clearInterval(timer);
   }, []);
 
+  // GPS Geofencing watcher (aligned with Attendance page)
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setGpsError('Geolocation not supported');
+      setGpsLocked(false);
+      return;
+    }
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setUserLat(latitude);
+        setUserLng(longitude);
+        setGpsLocked(true);
+        setGpsError(null);
+        const dist = haversineDistance(latitude, longitude, OFFICE_LAT, OFFICE_LNG);
+        setInsideZone(dist <= OFFICE_RADIUS);
+      },
+      (err) => {
+        setGpsError(err.message);
+        setGpsLocked(false);
+        setInsideZone(null);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Running stopwatch duration calculator (HH:MM:SS)
   const getRunningDuration = () => {
     if (!tapRecord || !tapRecord.check_in) return "00:00:00";
@@ -167,7 +227,7 @@ export default function DashboardPage() {
         if (todayRecord.check_in && !todayRecord.check_out) {
           setTapStatus('TAPPED_IN');
         } else if (todayRecord.check_in && todayRecord.check_out) {
-          setTapStatus('COMPLETED');
+          setTapStatus('TAPPED_OUT');
         }
       } else {
         setTapStatus('OFFLINE');
@@ -384,51 +444,66 @@ export default function DashboardPage() {
 
     try {
       if (tapStatus === 'OFFLINE') {
-        // Tap In
-        const checkInHour = currentTime.getHours();
-        const checkInMinute = currentTime.getMinutes();
-        const isLate = checkInHour > 9 || (checkInHour === 9 && checkInMinute > 15);
-        const status = isLate ? 'LATE' : 'PRESENT';
-
+        // Tap In — check geofencing (warn if outside, but allow)
+        if (insideZone === false) {
+          toast.warning('⚠️ You are outside the office zone. Tap-In recorded anyway.', { duration: 5000 });
+        }
+        const isLate = currentTime.getHours() > 9 || (currentTime.getHours() === 9 && currentTime.getMinutes() > 30);
         const record = await attendanceService.logAttendance({
           employee: empId,
           attendance_date: todayStr,
           check_in: timeStr,
-          status: status,
-          notes: `Tapped In via Enterprise Web Dashboard at ${currentTime.toLocaleTimeString()}`
+          status: isLate ? 'LATE' : 'PRESENT',
+          notes: `Tapped In via Dashboard at ${currentTime.toLocaleTimeString()}${insideZone === false ? ' [Outside Office Zone]' : ''}`
         });
-
         setTapRecord(record);
         setTapStatus('TAPPED_IN');
-        toast.success("Successfully Tapped In! Shift started.");
+        if (insideZone !== false) toast.success('Tapped In! Shift started.');
+
+      } else if (tapStatus === 'TAPPED_OUT') {
+        // Resume Shift — only before 6 PM
+        if (!isBefore6PM) {
+          toast.error('Resuming shifts is only allowed before 6:00 PM.');
+          setIsTapping(false);
+          return;
+        }
+        if (insideZone === false) {
+          toast.warning('⚠️ You are outside the office zone. Resuming shift anyway.', { duration: 5000 });
+        }
+        const record = await attendanceService.updateAttendance(tapRecord!.id, {
+          check_in: timeStr, check_out: null,
+          notes: `${tapRecord?.notes || ''}\nResumed shift via Dashboard at ${currentTime.toLocaleTimeString()}${insideZone === false ? ' [Outside Office Zone]' : ''}`
+        });
+        setTapRecord(record);
+        setTapStatus('TAPPED_IN');
+        if (insideZone !== false) toast.success('Shift resumed!');
+
       } else if (tapStatus === 'TAPPED_IN') {
-        // Tap Out
+        // Tap Out — warn if outside zone but always allow
         if (!tapRecord || !tapRecord.id) {
           toast.error("Tap record is missing. Reloading status...");
           await checkTodayTapStatus();
           setIsTapping(false);
           return;
         }
-
-        // Calculate hours worked (down to precision seconds to exactly match stopwatch)
+        if (insideZone === false) {
+          toast.warning('⚠️ You are outside the office zone. Tap-Out recorded anyway.', { duration: 5000 });
+        }
         const checkInTime = tapRecord.check_in || "09:00:00";
         const [inH, inM, inS] = checkInTime.split(':').map(Number);
-        const outH = currentTime.getHours();
-        const outM = currentTime.getMinutes();
-        const outS = currentTime.getSeconds();
-        const diffMs = (outH * 3600 + outM * 60 + outS) - (inH * 3600 + inM * 60 + (inS || 0));
-        const sessionHours = Math.max(0.0001, Number((diffMs / 3600).toFixed(4)));
+        const diffSec = (currentTime.getHours() * 3600 + currentTime.getMinutes() * 60 + currentTime.getSeconds()) -
+                        (inH * 3600 + inM * 60 + (inS || 0));
+        const sessionHours = Math.max(0.0001, Number((diffSec / 3600).toFixed(4)));
         const total = Number(tapRecord.work_hours || 0) + sessionHours;
 
         const record = await attendanceService.updateAttendance(tapRecord.id, {
           check_out: timeStr,
           work_hours: total,
-          notes: `${tapRecord.notes || ''}\nTapped Out via Enterprise Web Dashboard at ${currentTime.toLocaleTimeString()}. Session: ${sessionHours.toFixed(2)}h | Total: ${total.toFixed(2)}h`
+          notes: `${tapRecord.notes || ''}\nTapped Out via Dashboard at ${currentTime.toLocaleTimeString()}. Session: ${sessionHours.toFixed(2)}h | Total: ${total.toFixed(2)}h${insideZone === false ? ' [Outside Office Zone]' : ''}`
         });
-
         setTapRecord(record);
-        setTapStatus('COMPLETED');
-        toast.success(`Successfully Tapped Out! Shift ended. Total: ${total.toFixed(2)}h`);
+        setTapStatus('TAPPED_OUT');
+        toast.success(`Tapped Out! Total: ${total.toFixed(2)}h`);
       }
       // Instantly update stats on dashboard
       await fetchDashboardData();
@@ -461,10 +536,40 @@ export default function DashboardPage() {
             {isAdmin ? 'Real-time organizational analytics and workforce tracking.' : 'Here is what is happening with your schedule today.'}
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all shadow-sm">
-          <Plus className="w-4 h-4" />
-          <span>Quick Actions</span>
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowQuickActions(!showQuickActions)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Quick Actions</span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${showQuickActions ? 'rotate-180' : ''}`} />
+          </button>
+          {showQuickActions && (
+            <div className="absolute right-0 mt-2 w-60 bg-white rounded-xl border border-slate-200 shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-2">
+              <button onClick={() => { navigate('/leaves'); setShowQuickActions(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors">
+                <FileEdit className="w-4 h-4 text-indigo-500" />
+                Request Leave
+              </button>
+              <button onClick={() => { navigate('/attendance'); setShowQuickActions(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors">
+                <CalendarCheck className="w-4 h-4 text-amber-500" />
+                Attendance Correction
+              </button>
+              {(isAdmin || isHR) && (
+                <button onClick={() => { setIsCreateModalOpen(true); setShowQuickActions(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">
+                  <Megaphone className="w-4 h-4 text-emerald-500" />
+                  Post Announcement
+                </button>
+              )}
+              {(isAdmin || isHR) && (
+                <button onClick={() => { navigate('/employees'); setShowQuickActions(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors">
+                  <Users className="w-4 h-4 text-purple-500" />
+                  Onboard New Staff
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main Grid: Stats & Shift Tap Card */}
@@ -633,11 +738,11 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
-              {tapStatus === 'COMPLETED' && (
+              {tapStatus === 'TAPPED_OUT' && (
                 <>
-                  <p className="text-xs font-black text-indigo-600 uppercase tracking-widest">SHIFT COMPLETED</p>
+                  <p className="text-xs font-black text-indigo-600 uppercase tracking-widest">{isBefore6PM ? 'SHIFT PAUSED' : 'SHIFT COMPLETED'}</p>
                   <p className="text-[11px] font-medium text-slate-500 px-4">
-                    Logged <span className="font-bold text-slate-800">{tapRecord?.work_hours ? Number(tapRecord.work_hours).toFixed(2) : 0}h</span> of work today. See you tomorrow!
+                    Logged <span className="font-bold text-slate-800">{tapRecord?.work_hours ? Number(tapRecord.work_hours).toFixed(2) : 0}h</span> of work today.{isBefore6PM ? ' Resume anytime before 6 PM.' : ' See you tomorrow!'}
                   </p>
                 </>
               )}
@@ -680,11 +785,28 @@ export default function DashboardPage() {
               </button>
             )}
 
-            {tapStatus === 'COMPLETED' && (
+            {tapStatus === 'TAPPED_OUT' && !isBefore6PM && (
               <div className="w-full flex items-center justify-center gap-2 py-4 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl font-bold text-sm">
                 <CheckCircle2 className="w-5 h-5" />
-                <span>Shift Logged Successfully</span>
+                <span>Shift Closed (After 6:00 PM)</span>
               </div>
+            )}
+
+            {tapStatus === 'TAPPED_OUT' && isBefore6PM && (
+              <button
+                disabled={isTapping}
+                onClick={handleTap}
+                className="w-full flex items-center justify-center gap-3 py-4 bg-slate-700 hover:bg-slate-800 text-white rounded-xl font-bold transition-all shadow-lg shadow-slate-200 group active:scale-[0.98]"
+              >
+                {isTapping ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <Fingerprint className="w-5 h-5 group-hover:scale-125 transition-transform" />
+                    <span>Resume Shift ▶</span>
+                  </>
+                )}
+              </button>
             )}
           </div>
 
