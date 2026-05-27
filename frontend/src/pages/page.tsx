@@ -494,7 +494,7 @@ export default function DashboardPage() {
         const diffSec = (currentTime.getHours() * 3600 + currentTime.getMinutes() * 60 + currentTime.getSeconds()) -
                         (inH * 3600 + inM * 60 + (inS || 0));
         const sessionHours = Math.max(0.0001, Number((diffSec / 3600).toFixed(4)));
-        const total = Number(tapRecord.work_hours || 0) + sessionHours;
+        const total = Number((Number(tapRecord.work_hours || 0) + sessionHours).toFixed(2));
 
         const record = await attendanceService.updateAttendance(tapRecord.id, {
           check_out: timeStr,

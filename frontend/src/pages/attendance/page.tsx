@@ -298,7 +298,7 @@ export default function AttendancePage() {
         const diffMs = (currentTime.getHours() * 3600 + currentTime.getMinutes() * 60 + currentTime.getSeconds()) -
                        (h * 3600 + m * 60 + (s || 0));
         const sessionHours = Math.max(0.0001, Number((diffMs / 3600).toFixed(4)));
-        const total = Number(tapRecord!.work_hours || 0) + sessionHours;
+        const total = Number((Number(tapRecord!.work_hours || 0) + sessionHours).toFixed(2));
         const rec = await attendanceService.updateAttendance(tapRecord!.id, {
           check_out: timeStr, work_hours: total,
           notes: `${tapRecord?.notes || ''}\nTapped Out at ${currentTime.toLocaleTimeString()}. Session: ${sessionHours.toFixed(2)}h | Total: ${total.toFixed(2)}h${insideZone === false ? ' [Outside Office Zone]' : ''}`
