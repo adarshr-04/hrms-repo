@@ -4,7 +4,7 @@ export interface AttendanceData {
   employee: number | string;
   attendance_date: string;
   check_in?: string;
-  check_out?: string;
+  check_out?: string | null;
   work_hours?: number;
   status: string;
   notes?: string;

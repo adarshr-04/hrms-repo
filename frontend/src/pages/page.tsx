@@ -135,14 +135,18 @@ export default function DashboardPage() {
       const [inH, inM, inS] = tapRecord.check_in.split(':').map(Number);
       const checkInDate = new Date(currentTime);
       checkInDate.setHours(inH, inM, inS || 0);
-      
-      const diffMs = currentTime.getTime() - checkInDate.getTime();
-      if (diffMs < 0) return "00:00:00";
-      
-      const hrs = Math.floor(diffMs / 3600000);
-      const mins = Math.floor((diffMs % 3600000) / 60000);
-      const secs = Math.floor((diffMs % 60000) / 1000);
-      
+
+      let diffMs = currentTime.getTime() - checkInDate.getTime();
+      if (diffMs < 0) diffMs = 0;
+
+      // Add previously logged work hours (for resumed shifts)
+      const previousMs = Number(tapRecord.work_hours || 0) * 3600000;
+      const totalMs = diffMs + previousMs;
+
+      const hrs = Math.floor(totalMs / 3600000);
+      const mins = Math.floor((totalMs % 3600000) / 60000);
+      const secs = Math.floor((totalMs % 60000) / 1000);
+
       const pad = (num: number) => String(num).padStart(2, '0');
       return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
     } catch (err) {
@@ -413,17 +417,18 @@ export default function DashboardPage() {
         const outM = currentTime.getMinutes();
         const outS = currentTime.getSeconds();
         const diffMs = (outH * 3600 + outM * 60 + outS) - (inH * 3600 + inM * 60 + (inS || 0));
-        const hours = Math.max(0.01, Number((diffMs / 3600).toFixed(4)));
+        const sessionHours = Math.max(0.0001, Number((diffMs / 3600).toFixed(4)));
+        const total = Number(tapRecord.work_hours || 0) + sessionHours;
 
         const record = await attendanceService.updateAttendance(tapRecord.id, {
           check_out: timeStr,
-          work_hours: hours,
-          notes: `Tapped Out via Enterprise Web Dashboard at ${currentTime.toLocaleTimeString()}. Logged ${hours.toFixed(2)}h.`
+          work_hours: total,
+          notes: `${tapRecord.notes || ''}\nTapped Out via Enterprise Web Dashboard at ${currentTime.toLocaleTimeString()}. Session: ${sessionHours.toFixed(2)}h | Total: ${total.toFixed(2)}h`
         });
 
         setTapRecord(record);
         setTapStatus('COMPLETED');
-        toast.success(`Successfully Tapped Out! Shift ended. Total: ${hours.toFixed(2)}h`);
+        toast.success(`Successfully Tapped Out! Shift ended. Total: ${total.toFixed(2)}h`);
       }
       // Instantly update stats on dashboard
       await fetchDashboardData();

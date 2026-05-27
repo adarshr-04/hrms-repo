@@ -8,7 +8,6 @@ import {
   Loader2,
   Fingerprint,
   MapPin,
-  Wifi,
   ChevronLeft,
   ChevronRight,
   Plus,
@@ -39,7 +38,7 @@ interface AttendanceRecord {
   employee_name?: string;
   attendance_date: string;
   check_in?: string;
-  check_out?: string;
+  check_out?: string | null;
   work_hours?: number;
   status: 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'ON_LEAVE';
   notes?: string;
@@ -99,6 +98,26 @@ export default function AttendancePage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isTapping,  setIsTapping]  = useState(false);
   const [gpsLocked,  setGpsLocked]  = useState(false);
+  const [userLat,    setUserLat]    = useState<number | null>(null);
+  const [userLng,    setUserLng]    = useState<number | null>(null);
+  const [insideZone, setInsideZone] = useState<boolean | null>(null); // null = unknown
+  const [gpsError,   setGpsError]   = useState<string | null>(null);
+  const isBefore6PM = currentTime.getHours() < 18;
+
+  // ── Office zone config (change to your actual office coordinates) ──
+  const OFFICE_LAT    = 12.906245151822224;   // Office latitude
+  const OFFICE_LNG    = 77.57907788025564;    // Office longitude
+  const OFFICE_RADIUS = 500;                  // Radius in metres
+
+  const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371000; // Earth radius in metres
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
 
   // correction request modal
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -126,10 +145,32 @@ export default function AttendancePage() {
     return () => clearInterval(timer);
   }, []);
 
-  // simulate GPS lock after 1.5s
+  // ── Real GPS geofencing using browser Geolocation API ──
   useEffect(() => {
-    const t = setTimeout(() => setGpsLocked(true), 1500);
-    return () => clearTimeout(t);
+    if (!navigator.geolocation) {
+      setGpsError('Geolocation not supported');
+      setGpsLocked(false);
+      return;
+    }
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setUserLat(latitude);
+        setUserLng(longitude);
+        setGpsLocked(true);
+        setGpsError(null);
+        const dist = haversineDistance(latitude, longitude, OFFICE_LAT, OFFICE_LNG);
+        setInsideZone(dist <= OFFICE_RADIUS);
+      },
+      (err) => {
+        setGpsError(err.message);
+        setGpsLocked(false);
+        setInsideZone(null);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── running stopwatch ──
@@ -139,10 +180,18 @@ export default function AttendancePage() {
       const [h, m, s] = tapRecord.check_in.split(':').map(Number);
       const base = new Date(currentTime);
       base.setHours(h, m, s || 0);
-      const diff = currentTime.getTime() - base.getTime();
-      if (diff < 0) return '00:00:00';
+      let diff = currentTime.getTime() - base.getTime();
+      if (diff < 0) diff = 0;
+
+      // Add previously logged work hours (for resumed shifts)
+      const previousMs = Number(tapRecord.work_hours || 0) * 3600000;
+      const totalMs = diff + previousMs;
+
       const pad = (n: number) => String(n).padStart(2, '0');
-      return `${pad(Math.floor(diff / 3600000))}:${pad(Math.floor((diff % 3600000) / 60000))}:${pad(Math.floor((diff % 60000) / 1000))}`;
+      const hrs = Math.floor(totalMs / 3600000);
+      const mins = Math.floor((totalMs % 3600000) / 60000);
+      const secs = Math.floor((totalMs % 60000) / 1000);
+      return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
     } catch { return '00:00:00'; }
   };
 
@@ -212,22 +261,39 @@ export default function AttendancePage() {
 
     try {
       if (tapStatus === 'OFFLINE') {
+        // Tap In — check if inside zone (warn if not, but allow)
+        if (insideZone === false) {
+          toast.warning('⚠️ You are outside the office zone. Tap-In recorded anyway.', { duration: 5000 });
+        }
         const isLate = currentTime.getHours() > 9 || (currentTime.getHours() === 9 && currentTime.getMinutes() > 30);
         const rec = await attendanceService.logAttendance({
           employee: empId, attendance_date: todayStr, check_in: timeStr,
           status: isLate ? 'LATE' : 'PRESENT',
-          notes: `Tapped In at ${currentTime.toLocaleTimeString()}`
+          notes: `Tapped In at ${currentTime.toLocaleTimeString()}${insideZone === false ? ' [Outside Office Zone]' : ''}`
         });
         setTapRecord(rec); setTapStatus('TAPPED_IN');
-        toast.success('Tapped In! Shift started.');
+        if (insideZone !== false) toast.success('Tapped In! Shift started.');
       } else if (tapStatus === 'TAPPED_OUT') {
+        // Resume Shift — only before 6 PM
+        if (!isBefore6PM) {
+          toast.error('Resuming shifts is only allowed before 6:00 PM.');
+          setIsTapping(false);
+          return;
+        }
+        if (insideZone === false) {
+          toast.warning('⚠️ You are outside the office zone. Resuming shift anyway.', { duration: 5000 });
+        }
         const rec = await attendanceService.updateAttendance(tapRecord!.id, {
-          check_in: timeStr, check_out: undefined,
-          notes: `${tapRecord?.notes || ''}\nResumed shift at ${currentTime.toLocaleTimeString()}`
+          check_in: timeStr, check_out: null,
+          notes: `${tapRecord?.notes || ''}\nResumed shift at ${currentTime.toLocaleTimeString()}${insideZone === false ? ' [Outside Office Zone]' : ''}`
         });
         setTapRecord(rec); setTapStatus('TAPPED_IN');
-        toast.success('Tapped In again! Shift resumed.');
+        if (insideZone !== false) toast.success('Tapped In again! Shift resumed.');
       } else {
+        // Tap Out — warn if outside zone but always allow
+        if (insideZone === false) {
+          toast.warning('⚠️ You are outside the office zone. Tap-Out recorded anyway.', { duration: 5000 });
+        }
         const [h, m, s] = (tapRecord!.check_in || '09:30:00').split(':').map(Number);
         const diffMs = (currentTime.getHours() * 3600 + currentTime.getMinutes() * 60 + currentTime.getSeconds()) -
                        (h * 3600 + m * 60 + (s || 0));
@@ -235,10 +301,11 @@ export default function AttendancePage() {
         const total = Number(tapRecord!.work_hours || 0) + sessionHours;
         const rec = await attendanceService.updateAttendance(tapRecord!.id, {
           check_out: timeStr, work_hours: total,
-          notes: `${tapRecord?.notes || ''}\nTapped Out at ${currentTime.toLocaleTimeString()}. Session: ${sessionHours.toFixed(2)}h | Total: ${total.toFixed(2)}h`
+          notes: `${tapRecord?.notes || ''}\nTapped Out at ${currentTime.toLocaleTimeString()}. Session: ${sessionHours.toFixed(2)}h | Total: ${total.toFixed(2)}h${insideZone === false ? ' [Outside Office Zone]' : ''}`
         });
         setTapRecord(rec); setTapStatus('TAPPED_OUT');
-        toast.success(`Tapped Out! Total: ${total.toFixed(2)}h`);
+        if (insideZone !== false) toast.success(`Tapped Out! Total: ${total.toFixed(2)}h`);
+        else toast.success(`Tapped Out! Total: ${total.toFixed(2)}h (outside office zone)`);
       }
       await Promise.all([fetchAttendance(), checkTodayTapStatus()]);
     } catch (err) { toast.error('Tap failed. Please try again.'); }
@@ -402,20 +469,38 @@ export default function AttendancePage() {
                   <div className="text-indigo-200 text-xs font-semibold mt-1">Not checked in today</div>
                 )}
               </div>
-              <button
-                onClick={handleTap}
-                disabled={isTapping}
-                className={cn(
-                  'mt-4 w-full py-2.5 rounded-xl font-black text-sm transition-all active:scale-95',
-                  tapStatus === 'TAPPED_IN'
-                    ? 'bg-rose-500 hover:bg-rose-400 text-white shadow-md shadow-rose-900/30'
-                    : 'bg-white/20 hover:bg-white/30 text-white border border-white/30'
-                )}
-              >
-                {isTapping
-                  ? <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                  : tapStatus === 'TAPPED_IN' ? 'Tap Out ⏹' : tapStatus === 'TAPPED_OUT' ? 'Resume Shift ▶' : 'Tap In ▶'}
-              </button>
+              {/* After 6 PM: TAPPED_OUT => hide Resume Shift, show disabled label */}
+              {tapStatus === 'TAPPED_OUT' && !isBefore6PM ? (
+                <div className="mt-4 w-full py-2.5 rounded-xl font-black text-xs text-center bg-white/10 text-white/50 border border-white/10 select-none">
+                  Shift Closed (After 6:00 PM)
+                </div>
+              ) : tapStatus === 'TAPPED_IN' && !isBefore6PM ? (
+                // After 6 PM and still tapped in → show Tap Out prominently
+                <button
+                  onClick={handleTap}
+                  disabled={isTapping}
+                  className="mt-4 w-full py-2.5 rounded-xl font-black text-sm transition-all active:scale-95 bg-rose-500 hover:bg-rose-400 text-white shadow-md shadow-rose-900/30"
+                >
+                  {isTapping
+                    ? <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                    : 'Tap Out ⏹'}
+                </button>
+              ) : (
+                <button
+                  onClick={handleTap}
+                  disabled={isTapping}
+                  className={cn(
+                    'mt-4 w-full py-2.5 rounded-xl font-black text-sm transition-all active:scale-95',
+                    tapStatus === 'TAPPED_IN'
+                      ? 'bg-rose-500 hover:bg-rose-400 text-white shadow-md shadow-rose-900/30'
+                      : 'bg-white/20 hover:bg-white/30 text-white border border-white/30'
+                  )}
+                >
+                  {isTapping
+                    ? <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                    : tapStatus === 'TAPPED_IN' ? 'Tap Out ⏹' : tapStatus === 'TAPPED_OUT' ? 'Resume Shift ▶' : 'Tap In ▶'}
+                </button>
+              )}
             </div>
 
             {/* GPS Geofencing Card */}
@@ -424,7 +509,10 @@ export default function AttendancePage() {
               <div className="absolute right-4 bottom-4 w-28 h-28 opacity-20">
                 {[28, 20, 12].map((s, i) => (
                   <div key={i} className={cn(
-                    'absolute rounded-full border border-emerald-400',
+                    'absolute rounded-full border',
+                    gpsError ? 'border-rose-400 opacity-20' :
+                    insideZone === false ? 'border-amber-400' :
+                    insideZone === true  ? 'border-emerald-400' : 'border-slate-400',
                     gpsLocked ? 'animate-ping' : 'opacity-30'
                   )} style={{
                     width: s * 4, height: s * 4,
@@ -436,34 +524,69 @@ export default function AttendancePage() {
                 ))}
                 <div className={cn(
                   'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full',
-                  gpsLocked ? 'bg-emerald-400' : 'bg-slate-500'
+                  gpsError ? 'bg-rose-500' :
+                  insideZone === false ? 'bg-amber-400' :
+                  insideZone === true  ? 'bg-emerald-400' : 'bg-slate-500'
                 )} />
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <Radio className={cn('w-4 h-4', gpsLocked ? 'text-emerald-400' : 'text-slate-500')} />
+                  <Radio className={cn('w-4 h-4',
+                    gpsError ? 'text-rose-400' :
+                    insideZone === false ? 'text-amber-400' :
+                    insideZone === true  ? 'text-emerald-400' : 'text-slate-500'
+                  )} />
                   <span className="text-slate-400 text-xs font-bold uppercase tracking-widest">Geofencing</span>
                 </div>
                 <div className={cn(
                   'text-sm font-black',
-                  gpsLocked ? 'text-emerald-400' : 'text-slate-500'
+                  gpsError ? 'text-rose-400' :
+                  insideZone === false ? 'text-amber-400' :
+                  insideZone === true  ? 'text-emerald-400' : 'text-slate-500'
                 )}>
-                  {gpsLocked ? '✓ Office Zone Secured' : 'Acquiring GPS...'}
+                  {gpsError
+                    ? '✕ GPS Unavailable'
+                    : !gpsLocked
+                    ? 'Acquiring GPS...'
+                    : insideZone === true
+                    ? '✓ Inside Office Zone'
+                    : insideZone === false
+                    ? '⚠ Outside Office Zone'
+                    : 'Checking zone...'}
                 </div>
                 <div className="text-slate-500 text-[10px] font-semibold mt-1 font-mono">
-                  {gpsLocked ? '12.9716° N, 77.5946° E' : '--- ° N, --- ° E'}
+                  {userLat !== null && userLng !== null
+                    ? `${userLat.toFixed(4)}° N, ${userLng.toFixed(4)}° E`
+                    : '--- ° N, --- ° E'}
                 </div>
+                {insideZone === false && (
+                  <div className="mt-1.5 text-[9px] font-black text-amber-400 uppercase tracking-wider">
+                    ⚠ You are outside the office zone
+                  </div>
+                )}
               </div>
               <div className="mt-3 space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <Wifi className={cn('w-3.5 h-3.5', gpsLocked ? 'text-emerald-400' : 'text-slate-600')} />
-                  <span className="text-[10px] font-bold text-slate-400">CORP-WIFI-5G</span>
-                  {gpsLocked && <span className="text-[9px] font-black text-emerald-500 ml-auto">CONNECTED</span>}
+                  <MapPin className={cn('w-3.5 h-3.5',
+                    gpsLocked ? (insideZone === false ? 'text-amber-400' : 'text-emerald-400') : 'text-slate-600'
+                  )} />
+                  <span className="text-[10px] font-bold text-slate-400">Office Radius</span>
+                  <span className="text-[9px] font-black text-slate-500 ml-auto">{OFFICE_RADIUS}m</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Shield className={cn('w-3.5 h-3.5', gpsLocked ? 'text-emerald-400' : 'text-slate-600')} />
-                  <span className="text-[10px] font-bold text-slate-400">Network Auth</span>
-                  {gpsLocked && <span className="text-[9px] font-black text-emerald-500 ml-auto">VERIFIED</span>}
+                  <Shield className={cn('w-3.5 h-3.5',
+                    gpsError ? 'text-rose-400' : gpsLocked ? 'text-emerald-400' : 'text-slate-600'
+                  )} />
+                  <span className="text-[10px] font-bold text-slate-400">GPS Status</span>
+                  {gpsLocked && !gpsError && (
+                    <span className={cn(
+                      'text-[9px] font-black ml-auto',
+                      insideZone === false ? 'text-amber-500' : 'text-emerald-500'
+                    )}>
+                      {insideZone === false ? 'OUT OF ZONE' : 'VERIFIED'}
+                    </span>
+                  )}
+                  {gpsError && <span className="text-[9px] font-black text-rose-500 ml-auto">ERROR</span>}
                 </div>
               </div>
             </div>
