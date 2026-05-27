@@ -31,7 +31,6 @@ const navItems = [
   { name: 'Training', href: '/training', icon: GraduationCap, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
   { name: 'Recruitment', href: '/recruitment', icon: UserPlus, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
   { name: 'Reports', href: '/reports', icon: TrendingUp, roles: ['SUPER_ADMIN', 'ADMIN', 'HR'] },
-  { name: 'Progress Tracker', href: '/tracker', icon: ClipboardList, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
   { name: 'Settings', href: '/settings', icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'DEPT_MANAGER', 'EMPLOYEE'] },
 ];
 
