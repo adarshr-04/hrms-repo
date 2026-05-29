@@ -45,6 +45,19 @@ export interface Interview {
 }
 
 
+export interface OfferLetter {
+  id: number;
+  application: number;
+  offer_text: string;
+  status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED';
+  salary_offered?: string;
+  joining_date?: string | null;
+  candidate_name?: string;
+  job_title?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Application {
   id: number;
   job: number;
@@ -56,6 +69,7 @@ export interface Application {
   job_title?: string;
   candidate_name?: string;
   interviews?: Interview[];
+  offer_letter?: OfferLetter;
 }
 
 export const recruitmentService = {
@@ -118,6 +132,22 @@ export const recruitmentService = {
 
   deleteInterview: async (id: number): Promise<void> => {
     await api.delete(`/recruitment/interviews/${id}/`);
+  },
+
+  createOffer: async (data: Partial<OfferLetter>): Promise<OfferLetter> => {
+    const response = await api.post('/recruitment/offers/', data);
+    return response.data;
+  },
+
+  updateOffer: async (id: number, data: Partial<OfferLetter>): Promise<OfferLetter> => {
+    const response = await api.patch(`/recruitment/offers/${id}/`, data);
+    return response.data;
+  },
+
+  getOffers: async (params?: any): Promise<OfferLetter[]> => {
+    const response = await api.get('/recruitment/offers/', { params });
+    return response.data.results || response.data;
   }
 };
+
 

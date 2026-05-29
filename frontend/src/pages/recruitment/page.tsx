@@ -29,6 +29,10 @@ import { useAuth } from '@/context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import { Employee } from '@/types';
 import { toast } from 'sonner';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
+import OfferLetterModal from '@/components/OfferLetterModal';
+
 
 const STAGES = [
   { id: 'APPLIED', name: 'Applied', color: 'bg-blue-50 text-blue-700 border-blue-100' },
@@ -93,6 +97,138 @@ export default function RecruitmentPage() {
   const [updatingAppId, setUpdatingAppId] = useState<number | null>(null);
   const [uploadingResume, setUploadingResume] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Offer Letter specific state
+  const [offerText, setOfferText] = useState('');
+  const [salaryOffered, setSalaryOffered] = useState('');
+  const [joiningDate, setJoiningDate] = useState('');
+  const [savingOffer, setSavingOffer] = useState(false);
+  const [offerStatus, setOfferStatus] = useState<'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED'>('DRAFT');
+  const [offerId, setOfferId] = useState<number | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  useEffect(() => {
+    if (selectedApp) {
+      if (selectedApp.offer_letter) {
+        setOfferId(selectedApp.offer_letter.id);
+        setOfferText(selectedApp.offer_letter.offer_text);
+        setSalaryOffered(selectedApp.offer_letter.salary_offered || '');
+        setJoiningDate(selectedApp.offer_letter.joining_date || '');
+        setOfferStatus(selectedApp.offer_letter.status);
+      } else {
+        setOfferId(null);
+        setOfferText('');
+        setSalaryOffered('');
+        setJoiningDate('');
+        setOfferStatus('DRAFT');
+      }
+    } else {
+      setOfferId(null);
+      setOfferText('');
+      setSalaryOffered('');
+      setJoiningDate('');
+      setOfferStatus('DRAFT');
+    }
+  }, [selectedApp]);
+
+  const handleSaveOffer = async (
+    statusOverride?: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED',
+    customText?: string,
+    customSalary?: string
+  ) => {
+    if (!selectedApp) return;
+    setSavingOffer(true);
+    
+    const textToSave = customText !== undefined ? customText : offerText;
+    const salaryToSave = customSalary !== undefined ? customSalary : salaryOffered;
+    const targetStatus = statusOverride || offerStatus;
+
+    const payload = {
+      application: selectedApp.id,
+      offer_text: textToSave,
+      salary_offered: salaryToSave,
+      joining_date: joiningDate || null,
+      status: targetStatus
+    };
+
+    try {
+      let savedOffer;
+      if (offerId) {
+        savedOffer = await recruitmentService.updateOffer(offerId, payload);
+        toast.success("Offer letter updated successfully!");
+      } else {
+        savedOffer = await recruitmentService.createOffer(payload);
+        setOfferId(savedOffer.id);
+        toast.success("Offer letter created successfully!");
+      }
+      setOfferStatus(savedOffer.status);
+      
+      const updatedApp = { ...selectedApp, offer_letter: savedOffer };
+      setSelectedApp(updatedApp);
+      setApplications(prev => prev.map(a => a.id === selectedApp.id ? updatedApp : a));
+
+      setOfferText(textToSave);
+      setSalaryOffered(salaryToSave);
+      setShowOfferModal(false);
+    } catch (error) {
+      console.error("Failed to save offer letter", error);
+      toast.error("Failed to save offer letter");
+    } finally {
+      setSavingOffer(false);
+    }
+  };
+
+  const handleDownloadPDF = async (text: string) => {
+    if (!selectedCand) return;
+    setOfferText(text);
+
+    setTimeout(async () => {
+      const element = printRef.current;
+      if (!element) {
+        toast.error("Could not find the print container");
+        return;
+      }
+
+      setGeneratingPdf(true);
+      const loadingToast = toast.loading("Generating offer letter PDF...");
+      try {
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff'
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const imgWidth = 210;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+        const fileName = `Offer_Letter_${selectedCand.first_name}_${selectedCand.last_name}.pdf`;
+        pdf.save(fileName);
+
+        toast.dismiss(loadingToast);
+        toast.success("Offer letter downloaded successfully!");
+      } catch (error) {
+        console.error("PDF generation failed", error);
+        toast.dismiss(loadingToast);
+        toast.error("Could not generate PDF.");
+      } finally {
+        setGeneratingPdf(false);
+      }
+    }, 150);
+  };
+
+  const renderOfferTextHtml = (text: string) => {
+    return text.split('\n').map((line, i) => {
+      if (line.trim() === '') {
+        return <div key={i} className="h-4" />;
+      }
+      return <p key={i} className="text-slate-800 leading-relaxed mb-2 text-sm">{line}</p>;
+    });
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -1148,6 +1284,92 @@ export default function RecruitmentPage() {
                 </div>
               </div>
 
+              {selectedApp.status === 'OFFER' && (
+                <div className="bg-indigo-50/50 rounded-2xl p-6 border border-indigo-100 space-y-4">
+                  <div className="flex justify-between items-center border-b border-indigo-100 pb-3">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
+                      <FileText className="w-4 h-4 text-indigo-600" />
+                      <span>Offer Letter Management</span>
+                    </h3>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest border",
+                      offerStatus === 'DRAFT' ? "bg-amber-50 text-amber-700 border-amber-100" :
+                      offerStatus === 'SENT' ? "bg-blue-50 text-blue-700 border-blue-100" :
+                      offerStatus === 'ACCEPTED' ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
+                      "bg-rose-50 text-rose-700 border-rose-100"
+                    )}>
+                      Offer: {offerStatus}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Annual Salary Offered</label>
+                      <input 
+                        type="text"
+                        placeholder="e.g. USD 95,000"
+                        value={salaryOffered}
+                        onChange={(e) => setSalaryOffered(e.target.value)}
+                        className="w-full text-xs font-bold bg-white text-slate-700 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-indigo-500 transition-all shadow-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Expected Joining Date</label>
+                      <input 
+                        type="date"
+                        value={joiningDate}
+                        onChange={(e) => setJoiningDate(e.target.value)}
+                        className="w-full text-xs font-bold bg-white text-slate-700 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-indigo-500 transition-all shadow-sm cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowOfferModal(true)}
+                    className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Open Offer Workspace
+                  </button>
+
+                  <div className="flex flex-wrap justify-between items-center gap-2 pt-2 border-t border-indigo-100">
+                    <div className="flex gap-2">
+                      {offerStatus === 'DRAFT' && (
+                        <button 
+                          type="button"
+                          disabled={savingOffer || !offerId}
+                          onClick={() => handleSaveOffer('SENT')}
+                          className="text-[10px] px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-lg transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                          title={!offerId ? "Please save draft first" : "Mark as sent to candidate"}
+                        >
+                          Mark as Sent
+                        </button>
+                      )}
+
+                      {offerStatus === 'SENT' && (
+                        <div className="flex gap-1.5">
+                          <button 
+                            type="button"
+                            onClick={() => handleSaveOffer('ACCEPTED')}
+                            className="text-[10px] px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-all shadow-sm cursor-pointer"
+                          >
+                            Candidate Accepted
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleSaveOffer('REJECTED')}
+                            className="text-[10px] px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg transition-all shadow-sm cursor-pointer"
+                          >
+                            Rejected
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Scheduled Interviews timeline */}
               <div className="space-y-4">
                 <div className="flex justify-between items-center border-b border-slate-100 pb-2">
@@ -1512,6 +1734,74 @@ export default function RecruitmentPage() {
           </div>
         </div>
       )}
+
+      {selectedCand && selectedApp && (
+        <OfferLetterModal
+          isOpen={showOfferModal}
+          onClose={() => setShowOfferModal(false)}
+          personName={`${selectedCand.first_name} ${selectedCand.last_name}`}
+          jobTitle={selectedApp.job_title || 'Software Engineer'}
+          department="Engineering" // Default or read from application
+          hireDate={joiningDate}
+          employmentType="Full-Time"
+          onDownloadPDF={handleDownloadPDF}
+          onSaveDraft={(text, salary) => handleSaveOffer('DRAFT', text, salary)}
+          initialOfferText={offerText}
+          initialSalary={salaryOffered}
+          isGeneratingPdf={generatingPdf}
+          isSaving={savingOffer}
+          mode="recruitment"
+        />
+      )}
+
+      {/* Hidden Print Container for PDF Generation */}
+      <div className="absolute left-[-9999px] top-[-9999px]">
+        <div 
+          ref={printRef}
+          style={{ width: '210mm', minHeight: '297mm', padding: '25mm' }}
+          className="bg-white text-slate-900 font-sans flex flex-col justify-between border"
+        >
+          <div>
+            {/* Letterhead Header */}
+            <div className="flex justify-between items-start border-b border-slate-200 pb-6 mb-8">
+              <div>
+                <h1 className="text-2xl font-black text-indigo-700 tracking-tight">ENTERPRISE CORP</h1>
+                <p className="text-xs font-semibold text-slate-500 mt-1">Innovation & Talent Solutions</p>
+              </div>
+              <div className="text-right text-[10px] font-bold text-slate-400 leading-relaxed">
+                <p>100 Innovation Way, Suite 400</p>
+                <p>Tech District, CA 94016</p>
+                <p>careers@enterprise.com | +1 (555) 019-0000</p>
+              </div>
+            </div>
+
+            {/* Document Content */}
+            <div className="space-y-4 whitespace-pre-line text-slate-800 leading-relaxed text-sm">
+              {offerText ? (
+                offerText
+              ) : (
+                <p className="text-sm text-slate-400 italic">No offer text generated yet.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Signature Footer */}
+          <div className="border-t border-slate-200 pt-8 mt-12 grid grid-cols-2 gap-8 text-xs font-bold text-slate-700">
+            <div>
+              <p className="text-slate-400 mb-8 uppercase tracking-widest text-[9px]">For Enterprise Corp</p>
+              <div className="border-b border-slate-300 w-48 mb-2 h-6" />
+              <p>Authorized Signature</p>
+              <p className="text-slate-400 font-medium mt-0.5">Human Resources Director</p>
+            </div>
+            <div>
+              <p className="text-slate-400 mb-8 uppercase tracking-widest text-[9px]">Candidate Acceptance</p>
+              <div className="border-b border-slate-300 w-48 mb-2 h-6" />
+              <p>Signature of Candidate</p>
+              <p className="text-slate-400 font-medium mt-0.5">Date</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

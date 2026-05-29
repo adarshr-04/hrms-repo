@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import JobPosting, Candidate, Application, Interview
+from .models import JobPosting, Candidate, Application, Interview, OfferLetter
 
 class JobPostingSerializer(serializers.ModelSerializer):
     application_count = serializers.IntegerField(source='applications.count', read_only=True)
@@ -33,10 +33,20 @@ class InterviewSerializer(serializers.ModelSerializer):
         return None
 
 
+class OfferLetterSerializer(serializers.ModelSerializer):
+    candidate_name = serializers.ReadOnlyField(source='application.candidate.__str__')
+    job_title = serializers.ReadOnlyField(source='application.job.title')
+
+    class Meta:
+        model = OfferLetter
+        fields = '__all__'
+
+
 class ApplicationSerializer(serializers.ModelSerializer):
     job_title = serializers.ReadOnlyField(source='job.title')
     candidate_name = serializers.ReadOnlyField(source='candidate.__str__')
     interviews = InterviewSerializer(many=True, read_only=True)
+    offer_letter = OfferLetterSerializer(read_only=True)
 
     class Meta:
         model = Application

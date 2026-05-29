@@ -25,7 +25,10 @@ import {
   UserCheck,
   Upload,
   Download,
-  File
+  File,
+  X,
+  Sparkles,
+  Save
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { employeeService } from '@/services/employeeService';
@@ -36,6 +39,10 @@ import { performanceService } from '@/services/performanceService';
 import { trainingService } from '@/services/trainingService';
 import { documentService, Document as DocType } from '@/services/documentService';
 import { toast } from 'sonner';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
+import OfferLetterModal from '@/components/OfferLetterModal';
+
 
 export default function EmployeeProfilePage() {
   const [searchParams] = useSearchParams();
@@ -54,6 +61,100 @@ export default function EmployeeProfilePage() {
   const [uploading, setUploading] = useState(false);
   const [selectedDocType, setSelectedDocType] = useState('Offer Letter');
   const docInputRef = useRef<HTMLInputElement>(null);
+
+  // Offer Letter Generator state
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [offerText, setOfferText] = useState('');
+  const [offerSalary, setOfferSalary] = useState('');
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const offerPrintRef = useRef<HTMLDivElement>(null);
+
+  const handleOfferDownloadPDF = async (text: string) => {
+    setOfferText(text);
+    setTimeout(async () => {
+      if (!employee) return;
+      const element = offerPrintRef.current;
+      if (!element) {
+        toast.error('Could not find the print container');
+        return;
+      }
+
+      setGeneratingPdf(true);
+      const loadingToast = toast.loading('Generating offer letter PDF...');
+      try {
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff'
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const imgWidth = 210;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+        const fileName = `Offer_Letter_${employee.first_name}_${employee.last_name || 'Employee'}.pdf`;
+        pdf.save(fileName);
+
+        toast.dismiss(loadingToast);
+        toast.success('Offer letter PDF downloaded!');
+      } catch (error) {
+        console.error('PDF generation failed', error);
+        toast.dismiss(loadingToast);
+        toast.error('Could not generate PDF.');
+      } finally {
+        setGeneratingPdf(false);
+      }
+    }, 150);
+  };
+
+  const handleOfferSaveToVault = async (text: string) => {
+    setOfferText(text);
+    setTimeout(async () => {
+      if (!employee) return;
+      const element = offerPrintRef.current;
+      if (!element) {
+        toast.error('Could not find the print container');
+        return;
+      }
+
+      setGeneratingPdf(true);
+      const loadingToast = toast.loading('Saving offer letter to Digital Vault...');
+      try {
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff'
+        });
+
+        const blob = await new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob(b => b ? resolve(b) : reject(new Error('Canvas toBlob failed')), 'image/png');
+        });
+
+        const fileName = `Offer_Letter_${employee.first_name}_${employee.last_name || 'Employee'}.png`;
+        const file = new window.File([blob], fileName, { type: 'image/png' });
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('employee', String(employee.id));
+        formData.append('document_type', 'Offer Letter');
+
+        const newDoc = await documentService.upload(formData);
+        setDocuments(prev => [newDoc, ...prev]);
+
+        toast.dismiss(loadingToast);
+        toast.success('Offer letter saved to Digital Vault!');
+        setShowOfferModal(false);
+      } catch (error) {
+        console.error('Failed to save offer letter to vault', error);
+        toast.dismiss(loadingToast);
+        toast.error('Failed to save offer letter.');
+      } finally {
+        setGeneratingPdf(false);
+      }
+    }, 150);
+  };
 
   const fetchEmployee = async () => {
     setLoading(true);
@@ -379,7 +480,7 @@ export default function EmployeeProfilePage() {
                         {DOCUMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </div>
-                    <div>
+                    <div className="flex items-center gap-2">
                       <input type="file" ref={docInputRef} onChange={handleDocUpload} className="hidden" />
                       <button
                         onClick={() => docInputRef.current?.click()}
@@ -388,6 +489,17 @@ export default function EmployeeProfilePage() {
                       >
                         {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                         <span>{uploading ? 'Uploading...' : 'Select & Upload'}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setOfferText('');
+                          setOfferSalary('');
+                          setShowOfferModal(true);
+                        }}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-violet-100"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        <span>Generate Offer Letter</span>
                       </button>
                     </div>
                   </div>
@@ -450,6 +562,71 @@ export default function EmployeeProfilePage() {
                  <TimelineItem date="Current" title="Active Status" desc="Personnel is currently operational." icon={<UserCheck className="w-3 h-3" />} isLast />
               </div>
            </Section>
+        </div>
+      </div>
+
+      {/* Offer Letter Workspace Modal */}
+      {employee && (
+        <OfferLetterModal
+          isOpen={showOfferModal}
+          onClose={() => setShowOfferModal(false)}
+          personName={`${employee.first_name} ${employee.last_name || ''}`}
+          personId={employee.employee_id}
+          jobTitle={employee.job_title || 'Team Member'}
+          department={employee.department_name || 'General'}
+          hireDate={employee.hire_date}
+          employmentType={employee.employment_type?.replace('_', ' ')}
+          managerName={employee.manager_name}
+          onDownloadPDF={handleOfferDownloadPDF}
+          onSaveToVault={handleOfferSaveToVault}
+          isGeneratingPdf={generatingPdf}
+          isSaving={generatingPdf}
+          mode="employee"
+        />
+      )}
+
+      {/* Hidden A4 Print Container for Offer Letter PDF */}
+      <div className="absolute left-[-9999px] top-[-9999px]">
+        <div
+          ref={offerPrintRef}
+          style={{ width: '210mm', minHeight: '297mm', padding: '25mm' }}
+          className="bg-white text-slate-900 font-sans flex flex-col justify-between"
+        >
+          <div>
+            {/* Letterhead Header */}
+            <div className="flex justify-between items-start border-b-2 border-indigo-600 pb-6 mb-8">
+              <div>
+                <h1 className="text-3xl font-black text-indigo-700 tracking-tight">ENTERPRISE CORP</h1>
+                <p className="text-xs font-semibold text-slate-500 mt-1">Innovation & Talent Solutions</p>
+              </div>
+              <div className="text-right text-[10px] font-bold text-slate-400 leading-relaxed">
+                <p>100 Innovation Way, Suite 400</p>
+                <p>Tech District, CA 94016</p>
+                <p>careers@enterprise.com | +1 (555) 019-0000</p>
+              </div>
+            </div>
+
+            {/* Letter Content */}
+            <div className="whitespace-pre-line text-slate-800 leading-relaxed text-sm">
+              {offerText || 'No offer text generated yet.'}
+            </div>
+          </div>
+
+          {/* Signature Footer */}
+          <div className="border-t border-slate-200 pt-8 mt-16 grid grid-cols-2 gap-8 text-xs font-bold text-slate-700">
+            <div>
+              <p className="text-slate-400 mb-10 uppercase tracking-widest text-[9px]">For Enterprise Corp</p>
+              <div className="border-b border-slate-300 w-48 mb-2 h-6" />
+              <p>Authorized Signature</p>
+              <p className="text-slate-400 font-medium mt-0.5">Human Resources Director</p>
+            </div>
+            <div>
+              <p className="text-slate-400 mb-10 uppercase tracking-widest text-[9px]">Employee Acknowledgment</p>
+              <div className="border-b border-slate-300 w-48 mb-2 h-6" />
+              <p>Signature of Employee</p>
+              <p className="text-slate-400 font-medium mt-0.5">Date</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
