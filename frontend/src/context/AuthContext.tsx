@@ -57,6 +57,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
 
     try {
+      // Django SimpleJWT endpoint is mounted at `/api/token/` on the backend.
+      // In dev, Vite proxies `/api/*` to the backend; in prod `VITE_API_URL` should include `/api`.
       const response = await api.post('/token/', credentials);
       const { access, refresh } = response.data;
 

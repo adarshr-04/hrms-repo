@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:8000/api';
+// Dev default uses Vite proxy configured in `vite.config.ts` (routes `/api` -> Django on :8000).
+const API_BASE_URL = (import.meta as any).env.VITE_API_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
